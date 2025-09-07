@@ -69,18 +69,20 @@ Internet → Caddy (HTTPS) → Express API ↔ MongoDB, Redis
 - **DNS A/AAAA records** pointing to your Pi
 - **Firewall rules** allowing HTTP/HTTPS traffic
 
-## 🎯 Hosting Capabilities
+## 🎯 Hosting Platform Capabilities
 
 This Raspberry Pi 5 hosting platform provides:
 
-- **🌐 Web Application Hosting**: Deploy React, Vue, Angular, or static sites
-- **⚡ API Hosting**: Host Node.js, Python, or other API services
-- **🗄️ Database Hosting**: MongoDB and Redis for your applications
-- **🔒 SSL/TLS**: Automatic HTTPS certificates for all hosted domains
-- **⚖️ Load Balancing**: Distribute traffic across multiple application instances
-- **📊 Monitoring**: Real-time health checks and performance monitoring
-- **💾 Backup**: Automated backup and restore for hosted applications
-- **🔧 DevOps Tools**: CI/CD pipelines, automated deployments, and rollbacks
+- **🌐 Multi-Domain Hosting**: Host multiple websites on different domains
+- **📦 Project Deployment**: Deploy existing websites/projects from Git repositories
+- **⚡ Application Hosting**: Host Node.js, Python, PHP, or static sites
+- **🗄️ Database Services**: MongoDB and Redis for hosted applications
+- **🔒 SSL/TLS Management**: Automatic HTTPS certificates for all domains
+- **⚖️ Load Balancing**: Distribute traffic across multiple hosted applications
+- **📊 Monitoring Dashboard**: Real-time monitoring for all hosted projects
+- **💾 Backup & Restore**: Automated backups for all hosted data
+- **🔧 Management Panel**: Web interface to manage hosted projects
+- **🚀 One-Click Deploy**: Deploy projects with simple commands
 
 ## 📊 Project Status
 

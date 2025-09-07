@@ -10,6 +10,7 @@ import { Server as SocketIOServer } from 'socket.io';
 // Import routes
 import healthRoutes from './routes/health';
 import apiRoutes from './routes/api';
+import projectRoutes from './routes/projects';
 import { connectDatabase } from './config/database';
 import { connectRedis } from './config/redis';
 import { logger } from './config/logger';
@@ -71,6 +72,7 @@ app.use(rateLimiter);
 
 // Routes
 app.use('/api/health', healthRoutes);
+app.use('/api/projects', projectRoutes);
 app.use('/api', apiRoutes);
 
 // WebSocket setup
