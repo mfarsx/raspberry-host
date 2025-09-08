@@ -5,6 +5,7 @@ const path = require('path');
 const GitService = require('./gitService');
 const DockerService = require('./dockerService');
 const ProjectRepository = require('./projectRepository');
+const { getCacheService } = require('./cacheService');
 
 /**
  * Project Service - Main service for project management
@@ -20,6 +21,7 @@ class ProjectService {
     this.gitService = dependencies.gitService || new GitService();
     this.dockerService = dependencies.dockerService || new DockerService();
     this.projectRepository = dependencies.projectRepository || null;
+    this.cacheService = dependencies.cacheService || getCacheService();
     
     this.logger = logger;
     this.ensureProjectsDirectory();
@@ -51,7 +53,22 @@ class ProjectService {
    */
   async getAllProjects() {
     try {
-      return await this.getProjectRepository().getAllProjects();
+      const cacheKey = 'projects:all';
+      
+      // Try to get from cache first
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        this.logger.debug('Projects retrieved from cache');
+        return cached;
+      }
+      
+      // Get from repository
+      const projects = await this.getProjectRepository().getAllProjects();
+      
+      // Cache the result
+      await this.cacheService.set(cacheKey, projects, 60); // Cache for 1 minute
+      
+      return projects;
     } catch (error) {
       this.logger.error('Failed to get all projects:', error);
       return [];
@@ -117,6 +134,10 @@ class ProjectService {
       project.status = 'running';
       project.updatedAt = new Date();
       await this.getProjectRepository().saveProject(id, project);
+
+      // Invalidate cache
+      await this.cacheService.delete('projects:all');
+      await this.cacheService.delete(`project:${id}`);
 
       this.logger.info(`Project deployed successfully: ${project.name}`);
       return project;

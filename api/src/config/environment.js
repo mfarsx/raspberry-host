@@ -83,7 +83,26 @@ class EnvironmentConfig {
   // SECURITY CONFIGURATION
   // =============================================================================
   get jwtSecret() {
-    return process.env.JWT_SECRET || (this.isDevelopment ? 'dev-jwt-secret-key' : null);
+    const secret = process.env.JWT_SECRET;
+    
+    if (!secret) {
+      if (this.isDevelopment) {
+        // Generate a random secret for development
+        const crypto = require('crypto');
+        const devSecret = crypto.randomBytes(64).toString('hex');
+        console.warn('⚠️  Using auto-generated JWT secret for development. Set JWT_SECRET for production!');
+        return devSecret;
+      } else {
+        throw new Error('JWT_SECRET environment variable is required in production');
+      }
+    }
+    
+    // Validate secret strength
+    if (secret.length < 32) {
+      throw new Error('JWT_SECRET must be at least 32 characters long');
+    }
+    
+    return secret;
   }
 
   get corsOrigin() {

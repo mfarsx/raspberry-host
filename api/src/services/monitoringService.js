@@ -145,18 +145,48 @@ class MonitoringService {
    */
   async getDiskMetrics() {
     try {
-      // Get disk usage using df command
-      const { stdout } = await execAsync('df -h /');
-      const lines = stdout.trim().split('\n');
-      const data = lines[1].split(/\s+/);
+      const { spawn } = require('child_process');
+      
+      return new Promise((resolve) => {
+        const child = spawn('df', ['-h', '/'], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 10000 // 10 seconds timeout
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        child.on('close', (code) => {
+          if (code === 0) {
+            const lines = stdout.trim().split('\n');
+            const data = lines[1].split(/\s+/);
 
-      return {
-        total: data[1],
-        used: data[2],
-        available: data[3],
-        percentage: parseInt(data[4].replace('%', '')),
-        mountPoint: data[5]
-      };
+            resolve({
+              total: data[1],
+              used: data[2],
+              available: data[3],
+              percentage: parseInt(data[4].replace('%', '')),
+              mountPoint: data[5]
+            });
+          } else {
+            this.logger.warn('df command failed:', stderr);
+            resolve(null);
+          }
+        });
+        
+        child.on('error', (error) => {
+          this.logger.error('Failed to get disk metrics:', error);
+          resolve(null);
+        });
+      });
     } catch (error) {
       this.logger.error('Failed to get disk metrics:', error);
       return null;
@@ -198,24 +228,46 @@ class MonitoringService {
    */
   async getProcessMetrics() {
     try {
-      // Get top processes using ps command
-      const { stdout } = await execAsync('ps aux --sort=-%cpu | head -10');
-      const lines = stdout.trim().split('\n');
-      const processes = lines.slice(1).map(line => {
-        const parts = line.trim().split(/\s+/);
-        return {
-          pid: parts[1],
-          cpu: parseFloat(parts[2]),
-          memory: parseFloat(parts[3]),
-          command: parts.slice(10).join(' ')
-        };
-      });
+      const { spawn } = require('child_process');
+      
+      return new Promise((resolve) => {
+        const ps = spawn('ps', ['aux'], { stdio: ['pipe', 'pipe', 'pipe'] });
+        const head = spawn('head', ['-10'], { stdio: ['pipe', 'pipe', 'pipe'] });
+        
+        ps.stdout.pipe(head.stdin);
+        
+        let stdout = '';
+        head.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        head.on('close', (code) => {
+          if (code === 0) {
+            const lines = stdout.trim().split('\n');
+            const processes = lines.slice(1).map(line => {
+              const parts = line.trim().split(/\s+/);
+              return {
+                pid: parts[1],
+                cpu: parseFloat(parts[2]),
+                memory: parseFloat(parts[3]),
+                command: parts.slice(10).join(' ')
+              };
+            });
 
-      return {
-        total: process.pid, // This would need actual process count
-        topCpu: processes.slice(0, 5),
-        topMemory: processes.slice(0, 5) // Simplified - would need separate query
-      };
+            resolve({
+              total: process.pid, // This would need actual process count
+              topCpu: processes.slice(0, 5),
+              topMemory: processes.slice(0, 5) // Simplified - would need separate query
+            });
+          } else {
+            resolve(null);
+          }
+        });
+        
+        head.on('error', () => {
+          resolve(null);
+        });
+      });
     } catch (error) {
       this.logger.error('Failed to get process metrics:', error);
       return null;
@@ -228,23 +280,59 @@ class MonitoringService {
    */
   async getDockerMetrics() {
     try {
-      const { stdout } = await execAsync('docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}"');
-      const lines = stdout.trim().split('\n');
-      const containers = lines.slice(1).map(line => {
-        const parts = line.trim().split(/\s+/);
-        return {
-          container: parts[0],
-          cpu: parts[1],
-          memory: parts[2],
-          network: parts[3],
-          block: parts[4]
-        };
-      });
+      const { spawn } = require('child_process');
+      
+      return new Promise((resolve) => {
+        const child = spawn('docker', [
+          'stats',
+          '--no-stream',
+          '--format',
+          'table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}'
+        ], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000 // 30 seconds timeout
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        child.on('close', (code) => {
+          if (code === 0) {
+            const lines = stdout.trim().split('\n');
+            const containers = lines.slice(1).map(line => {
+              const parts = line.trim().split(/\s+/);
+              return {
+                container: parts[0],
+                cpu: parts[1],
+                memory: parts[2],
+                network: parts[3],
+                block: parts[4]
+              };
+            });
 
-      return {
-        containers,
-        total: containers.length
-      };
+            resolve({
+              containers,
+              total: containers.length
+            });
+          } else {
+            this.logger.warn('Docker stats command failed:', stderr);
+            resolve(null);
+          }
+        });
+        
+        child.on('error', (error) => {
+          this.logger.error('Failed to get Docker metrics:', error);
+          resolve(null);
+        });
+      });
     } catch (error) {
       this.logger.error('Failed to get Docker metrics:', error);
       return null;

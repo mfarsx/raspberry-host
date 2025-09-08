@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { logger } = require('../config/logger');
 const { ProjectService } = require('../services/projectService');
 const ValidationMiddleware = require('../middleware/validation');
+const AuthMiddleware = require('../middleware/auth');
 const projectSchemas = require('../schemas/projectSchemas');
 const { asyncHandler } = require('../middleware/errorHandler');
 
@@ -9,17 +10,21 @@ const router = Router();
 const projectService = new ProjectService();
 
 // Get all hosted projects
-router.get('/', asyncHandler(async (req, res) => {
-  const projects = await projectService.getAllProjects();
-  res.json({
-    success: true,
-    data: projects,
-    count: projects.length
-  });
-}));
+router.get('/', 
+  AuthMiddleware.verifyToken,
+  asyncHandler(async (req, res) => {
+    const projects = await projectService.getAllProjects();
+    res.json({
+      success: true,
+      data: projects,
+      count: projects.length
+    });
+  })
+);
 
 // Get project by ID
 router.get('/:id', 
+  AuthMiddleware.verifyToken,
   ValidationMiddleware.validateParams(projectSchemas.projectId),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
@@ -42,6 +47,8 @@ router.get('/:id',
 
 // Deploy new project
 router.post('/deploy', 
+  AuthMiddleware.verifyToken,
+  AuthMiddleware.requireRole('admin'),
   ValidationMiddleware.sanitizeInput,
   ValidationMiddleware.validateBody(projectSchemas.deployProject),
   asyncHandler(async (req, res) => {
@@ -59,6 +66,8 @@ router.post('/deploy',
 
 // Update project
 router.put('/:id', 
+  AuthMiddleware.verifyToken,
+  AuthMiddleware.requireRole('admin'),
   ValidationMiddleware.validateParams(projectSchemas.projectId),
   ValidationMiddleware.sanitizeInput,
   ValidationMiddleware.validateBody(projectSchemas.updateProject),
@@ -84,6 +93,8 @@ router.put('/:id',
 
 // Delete project
 router.delete('/:id', 
+  AuthMiddleware.verifyToken,
+  AuthMiddleware.requireRole('admin'),
   ValidationMiddleware.validateParams(projectSchemas.projectId),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
@@ -108,6 +119,8 @@ router.delete('/:id',
 
 // Restart project
 router.post('/:id/restart', 
+  AuthMiddleware.verifyToken,
+  AuthMiddleware.requireRole('admin'),
   ValidationMiddleware.validateParams(projectSchemas.projectId),
   asyncHandler(async (req, res) => {
     const { id } = req.params;
@@ -132,6 +145,7 @@ router.post('/:id/restart',
 
 // Get project logs
 router.get('/:id/logs', 
+  AuthMiddleware.verifyToken,
   ValidationMiddleware.validateParams(projectSchemas.projectId),
   ValidationMiddleware.validateQuery(projectSchemas.logsQuery),
   asyncHandler(async (req, res) => {
@@ -157,6 +171,7 @@ router.get('/:id/logs',
 
 // Get project status
 router.get('/:id/status', 
+  AuthMiddleware.verifyToken,
   ValidationMiddleware.validateParams(projectSchemas.projectId),
   asyncHandler(async (req, res) => {
     const { id } = req.params;

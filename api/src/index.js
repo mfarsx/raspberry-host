@@ -15,6 +15,7 @@ const { connectRedis } = require('./config/redis');
 const { logger, requestLogger, performanceLogger } = require('./config/logger');
 const { errorHandler } = require('./middleware/errorHandler');
 const { rateLimiter } = require('./middleware/rateLimiter');
+const requestIdMiddleware = require('./middleware/requestId');
 const { setupSocketIO } = require('./config/socketio');
 const config = require('./config/environment');
 const MonitoringService = require('./services/monitoringService');
@@ -57,6 +58,9 @@ app.use(cors({
 if (config.enableCompression) {
   app.use(compression());
 }
+
+// Request ID middleware
+app.use(requestIdMiddleware);
 
 // Enhanced request logging middleware
 app.use(requestLogger);
