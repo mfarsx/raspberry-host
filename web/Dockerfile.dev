@@ -22,9 +22,9 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p /app/build && \
-    chown -R nodejs:nodejs /app/build
+# Create necessary directories and fix permissions
+RUN mkdir -p /app/build /app/node_modules/.cache && \
+    chown -R nodejs:nodejs /app/build /app/node_modules/.cache
 
 # Switch to non-root user
 USER nodejs
