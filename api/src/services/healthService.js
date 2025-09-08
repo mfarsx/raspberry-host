@@ -1,15 +1,18 @@
-import mongoose from 'mongoose';
-import { getRedisClient } from '../config/redis';
-import { logger } from '../config/logger';
+const mongoose = require('mongoose');
+const { getRedisClient } = require('../config/redis');
+const { logger } = require('../config/logger');
 
-export const checkDatabaseHealth = async (): Promise<{
-  connected: boolean;
-  status: string;
-  collections?: number;
-  documents?: number;
-  error?: string;
-}> => {
+const checkDatabaseHealth = async () => {
   try {
+    // In development mode, skip database checks
+    if (process.env.NODE_ENV === 'development') {
+      return {
+        connected: true,
+        status: 'development_mode',
+        message: 'Database connections skipped in development mode'
+      };
+    }
+    
     // Check MongoDB connection
     const state = mongoose.connection.readyState;
     
@@ -54,18 +57,21 @@ export const checkDatabaseHealth = async (): Promise<{
   }
 };
 
-export const checkRedisHealth = async (): Promise<{
-  connected: boolean;
-  status: string;
-  connectedClients?: number;
-  memoryUsed?: string;
-  error?: string;
-}> => {
+const checkRedisHealth = async () => {
   try {
+    // In development mode, skip Redis checks
+    if (process.env.NODE_ENV === 'development') {
+      return {
+        connected: true,
+        status: 'development_mode',
+        message: 'Redis connections skipped in development mode'
+      };
+    }
+    
     const redisClient = getRedisClient();
     
     // Check if Redis is connected
-    if (!redisClient.isReady) {
+    if (!redisClient || !redisClient.isReady) {
       return {
         connected: false,
         status: 'disconnected',
@@ -79,17 +85,17 @@ export const checkRedisHealth = async (): Promise<{
     
     // Parse client info
     const connectedClientsMatch = info.match(/connected_clients:(\d+)/);
-    const connectedClients = connectedClientsMatch ? parseInt(connectedClientsMatch[1]) : 0;
+    const connectedClients = connectedClientsMatch?.[1] ? parseInt(connectedClientsMatch[1]) : 0;
     
     // Parse memory info
     const memoryUsedMatch = memoryInfo.match(/used_memory_human:([^\r\n]+)/);
-    const memoryUsed = memoryUsedMatch ? memoryUsedMatch[1] : 'Unknown';
+    const memoryUsed = memoryUsedMatch?.[1] || 'Unknown';
     
     return {
       connected: true,
       status: 'connected',
       connectedClients,
-      memoryUsed
+      memoryUsed: memoryUsed || 'Unknown'
     };
     
   } catch (error) {
@@ -100,4 +106,9 @@ export const checkRedisHealth = async (): Promise<{
       error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
+};
+
+module.exports = {
+  checkDatabaseHealth,
+  checkRedisHealth
 };

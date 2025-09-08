@@ -1,4 +1,5 @@
-version: '3.8'
+# Raspberry Pi 5 Hosting Platform - Production
+# Complete self-contained production setup
 
 services:
   # Reverse Proxy with automatic HTTPS
@@ -15,15 +16,15 @@ services:
       - caddy_config:/config
       - caddy_logs:/var/log/caddy
     environment:
-      - DOMAIN=${DOMAIN}
-      - TLS_EMAIL=${TLS_EMAIL}
+      - DOMAIN=${DOMAIN:-localhost}
+      - TLS_EMAIL=${TLS_EMAIL:-admin@localhost}
     depends_on:
       api:
         condition: service_healthy
       web:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "caddy", "healthcheck", "--config", "/etc/caddy/Caddyfile"]
+      test: [ "CMD", "caddy", "healthcheck", "--config", "/etc/caddy/Caddyfile" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -41,15 +42,16 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
+      target: production
       platforms:
         - linux/arm64
     container_name: pi-api
     restart: unless-stopped
     environment:
-      - NODE_ENV=${NODE_ENV:-production}
-      - PORT=${PORT:-3001}
-      - MONGO_URL=${MONGO_URL}
-      - REDIS_URL=${REDIS_URL}
+      - NODE_ENV=production
+      - PORT=3001
+      - MONGO_URL=${MONGO_URL:-mongodb://pi_user:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DATABASE:-pi_app}}
+      - REDIS_URL=${REDIS_URL:-redis://:${REDIS_PASSWORD}@redis:6379}
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN:-https://${DOMAIN}}
       - LOG_LEVEL=${LOG_LEVEL:-info}
@@ -62,7 +64,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:3001/api/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -80,6 +82,7 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+      target: production
       platforms:
         - linux/arm64
     container_name: pi-web
@@ -87,11 +90,11 @@ services:
     environment:
       - REACT_APP_API_URL=https://${DOMAIN}/api
       - REACT_APP_WS_URL=wss://${DOMAIN}/ws
-      - REACT_APP_ENV=${NODE_ENV:-production}
+      - REACT_APP_ENV=production
     volumes:
       - web_build:/app/build
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      test: [ "CMD", "curl", "-f", "http://localhost:80" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -116,17 +119,12 @@ services:
     volumes:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb
-      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
       - mongodb_logs:/var/log/mongodb
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     command: >
-      mongod 
-      --auth 
-      --bind_ip_all 
-      --logpath /var/log/mongodb/mongod.log
-      --logappend
-      --wiredTigerCacheSizeGB 0.5
+      mongod  --auth  --bind_ip_all  --logpath /var/log/mongodb/mongod.log --logappend --wiredTigerCacheSizeGB 0.5
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -144,20 +142,15 @@ services:
     image: redis:7.2-alpine
     container_name: pi-redis
     restart: unless-stopped
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
     command: >
-      redis-server 
-      --appendonly yes 
-      --requirepass ${REDIS_PASSWORD}
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
-      --save 900 1
-      --save 300 10
-      --save 60 10000
+      redis-server  --appendonly yes  --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10 --save 60 10000
     volumes:
       - redis_data:/data
       - redis_logs:/var/log/redis
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -170,7 +163,7 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # Monitoring and Logging
+  # Auto-updater
   watchtower:
     image: containrrr/watchtower:latest
     container_name: pi-watchtower
@@ -199,7 +192,15 @@ volumes:
     driver: local
   caddy_logs:
     driver: local
-  
+
+  # Application volumes
+  web_build:
+    driver: local
+  api_logs:
+    driver: local
+  api_uploads:
+    driver: local
+
   # Database volumes
   mongodb_data:
     driver: local
@@ -207,19 +208,9 @@ volumes:
     driver: local
   mongodb_logs:
     driver: local
-  
-  # Redis volumes
   redis_data:
     driver: local
   redis_logs:
-    driver: local
-  
-  # Application volumes
-  api_logs:
-    driver: local
-  api_uploads:
-    driver: local
-  web_build:
     driver: local
 
 networks:

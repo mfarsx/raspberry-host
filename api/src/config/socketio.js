@@ -1,17 +1,16 @@
-import { Server as SocketIOServer, Socket } from 'socket.io';
-import { logger } from './logger';
-import { getRedisClient } from './redis';
+const { logger } = require('./logger');
+const { getRedisClient } = require('./redis');
 
-export const setupSocketIO = (io: SocketIOServer): void => {
+const setupSocketIO = (io) => {
   // Connection handling
-  io.on('connection', (socket: Socket) => {
+  io.on('connection', (socket) => {
     logger.info(`Client connected: ${socket.id}`);
     
     // Join client to a room for broadcasting
     socket.join('general');
     
     // Handle client messages
-    socket.on('message', (data: any) => {
+    socket.on('message', (data) => {
       logger.info(`Message from ${socket.id}:`, data);
       
       // Echo the message back to the client
@@ -43,7 +42,7 @@ export const setupSocketIO = (io: SocketIOServer): void => {
     });
     
     // Handle echo requests
-    socket.on('echo', (data: any) => {
+    socket.on('echo', (data) => {
       socket.emit('echo', {
         message: data.message,
         timestamp: new Date().toISOString(),
@@ -59,20 +58,24 @@ export const setupSocketIO = (io: SocketIOServer): void => {
     });
     
     // Handle disconnection
-    socket.on('disconnect', (reason: string) => {
+    socket.on('disconnect', (reason) => {
       logger.info(`Client disconnected: ${socket.id}, reason: ${reason}`);
     });
     
     // Handle errors
-    socket.on('error', (error: Error) => {
+    socket.on('error', (error) => {
       logger.error(`Socket error from ${socket.id}:`, error);
     });
   });
   
   // Server-wide events
-  io.engine.on('connection_error', (error: Error) => {
+  io.engine.on('connection_error', (error) => {
     logger.error('Socket.IO connection error:', error);
   });
   
   logger.info('Socket.IO server configured');
+};
+
+module.exports = {
+  setupSocketIO
 };

@@ -1,19 +1,16 @@
-import mongoose from 'mongoose';
-import { logger } from './logger';
+const mongoose = require('mongoose');
+const { logger } = require('./logger');
+const config = require('./environment');
 
-const MONGO_URL = process.env.MONGO_URL || 'mongodb://localhost:27017/pi_app';
-
-export const connectDatabase = async (): Promise<void> => {
+const connectDatabase = async () => {
   try {
     const options = {
-      maxPoolSize: 10, // Maintain up to 10 socket connections
-      serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
-      socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
-      bufferMaxEntries: 0, // Disable mongoose buffering
-      bufferCommands: false, // Disable mongoose buffering
+      maxPoolSize: config.mongoMaxPoolSize,
+      serverSelectionTimeoutMS: config.mongoServerSelectionTimeout,
+      socketTimeoutMS: config.mongoSocketTimeout,
     };
 
-    await mongoose.connect(MONGO_URL, options);
+    await mongoose.connect(config.mongoUrl, options);
     
     logger.info('✅ Connected to MongoDB successfully');
     
@@ -43,7 +40,7 @@ export const connectDatabase = async (): Promise<void> => {
   }
 };
 
-export const disconnectDatabase = async (): Promise<void> => {
+const disconnectDatabase = async () => {
   try {
     await mongoose.connection.close();
     logger.info('MongoDB connection closed');
@@ -51,4 +48,9 @@ export const disconnectDatabase = async (): Promise<void> => {
     logger.error('Error closing MongoDB connection:', error);
     throw error;
   }
+};
+
+module.exports = {
+  connectDatabase,
+  disconnectDatabase
 };

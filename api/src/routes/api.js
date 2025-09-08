@@ -1,11 +1,10 @@
-import { Router } from 'express';
-import { Request, Response } from 'express';
-import { logger } from '../config/logger';
+const { Router } = require('express');
+const { logger } = require('../config/logger');
 
 const router = Router();
 
 // Basic API routes
-router.get('/', (req: Request, res: Response) => {
+router.get('/', (req, res) => {
   res.json({
     success: true,
     message: 'Raspberry Pi 5 Hosting Platform API',
@@ -20,7 +19,7 @@ router.get('/', (req: Request, res: Response) => {
 });
 
 // System stats endpoint
-router.get('/stats', async (req: Request, res: Response) => {
+router.get('/stats', async (req, res) => {
   try {
     const stats = {
       timestamp: new Date().toISOString(),
@@ -63,8 +62,9 @@ router.get('/stats', async (req: Request, res: Response) => {
 });
 
 // System information endpoint
-router.get('/system', async (req: Request, res: Response) => {
+router.get('/system', async (req, res) => {
   try {
+    const os = require('os');
     const systemInfo = {
       timestamp: new Date().toISOString(),
       platform: process.platform,
@@ -79,21 +79,21 @@ router.get('/system', async (req: Request, res: Response) => {
         PORT: process.env.PORT || '3001'
       },
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      hostname: require('os').hostname(),
-      loadAverage: require('os').loadavg(),
+      hostname: os.hostname(),
+      loadAverage: os.loadavg(),
       memory: {
-        total: Math.round(require('os').totalmem() / 1024 / 1024 / 1024) + 'GB',
-        free: Math.round(require('os').freemem() / 1024 / 1024 / 1024) + 'GB',
-        used: Math.round((require('os').totalmem() - require('os').freemem()) / 1024 / 1024 / 1024) + 'GB',
-        usage: Math.round(((require('os').totalmem() - require('os').freemem()) / require('os').totalmem()) * 100) + '%'
+        total: Math.round(os.totalmem() / 1024 / 1024 / 1024) + 'GB',
+        free: Math.round(os.freemem() / 1024 / 1024 / 1024) + 'GB',
+        used: Math.round((os.totalmem() - os.freemem()) / 1024 / 1024 / 1024) + 'GB',
+        usage: Math.round(((os.totalmem() - os.freemem()) / os.totalmem()) * 100) + '%'
       },
       cpu: {
-        model: require('os').cpus()[0].model,
-        cores: require('os').cpus().length,
-        speed: require('os').cpus()[0].speed + 'MHz'
+        model: os.cpus()[0].model,
+        cores: os.cpus().length,
+        speed: os.cpus()[0].speed + 'MHz'
       },
       network: {
-        interfaces: require('os').networkInterfaces()
+        interfaces: os.networkInterfaces()
       }
     };
     
@@ -109,4 +109,4 @@ router.get('/system', async (req: Request, res: Response) => {
   }
 });
 
-export default router;
+module.exports = router;

@@ -7,7 +7,7 @@ db = db.getSiblingDB(process.env.MONGO_INITDB_DATABASE || 'pi_app');
 // Create application user
 db.createUser({
   user: 'pi_user',
-  pwd: process.env.MONGO_PASSWORD || 'defaultpassword',
+  pwd: process.env.MONGO_ROOT_PASSWORD || 'defaultpassword',
   roles: [
     {
       role: 'readWrite',

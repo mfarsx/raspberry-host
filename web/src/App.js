@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from 'react-query';
 import toast from 'react-hot-toast';
 
 // Components
-import Dashboard from './components/Dashboard';
+import DashboardRefactored from './components/DashboardRefactored';
 import ProjectManagement from './components/ProjectManagement';
 import DeployProject from './components/DeployProject';
 import SystemInfo from './components/SystemInfo';
@@ -110,7 +110,7 @@ function App() {
 
           <main className="container">
             <Routes>
-              <Route path="/" element={<Dashboard apiHealth={apiHealth} socketConnected={socketConnected} />} />
+              <Route path="/" element={<DashboardRefactored />} />
               <Route path="/projects" element={<ProjectManagement />} />
               <Route path="/deploy" element={<DeployProject />} />
               <Route path="/websocket" element={<WebSocketTest socket={socket} connected={socketConnected} />} />

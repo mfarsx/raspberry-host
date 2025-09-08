@@ -1,9 +1,8 @@
-import rateLimit from 'express-rate-limit';
-import { Request, Response } from 'express';
-import { logger } from '../config/logger';
+const rateLimit = require('express-rate-limit');
+const { logger } = require('../config/logger');
 
 // General rate limiter
-export const rateLimiter = rateLimit({
+const rateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
   message: {
@@ -13,7 +12,7 @@ export const rateLimiter = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  handler: (req: Request, res: Response) => {
+  handler: (req, res) => {
     logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
     res.status(429).json({
       success: false,
@@ -24,7 +23,7 @@ export const rateLimiter = rateLimit({
 });
 
 // Strict rate limiter for sensitive endpoints
-export const strictRateLimiter = rateLimit({
+const strictRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 5, // Limit each IP to 5 requests per windowMs
   message: {
@@ -34,7 +33,7 @@ export const strictRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
+  handler: (req, res) => {
     logger.warn(`Strict rate limit exceeded for IP: ${req.ip}`);
     res.status(429).json({
       success: false,
@@ -45,7 +44,7 @@ export const strictRateLimiter = rateLimit({
 });
 
 // API rate limiter
-export const apiRateLimiter = rateLimit({
+const apiRateLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minute
   max: 60, // Limit each IP to 60 requests per minute
   message: {
@@ -55,7 +54,7 @@ export const apiRateLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  handler: (req: Request, res: Response) => {
+  handler: (req, res) => {
     logger.warn(`API rate limit exceeded for IP: ${req.ip}`);
     res.status(429).json({
       success: false,
@@ -64,3 +63,9 @@ export const apiRateLimiter = rateLimit({
     });
   }
 });
+
+module.exports = {
+  rateLimiter,
+  strictRateLimiter,
+  apiRateLimiter
+};

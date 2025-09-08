@@ -1,13 +1,11 @@
-import { Router } from 'express';
-import { Request, Response } from 'express';
-import { logger } from '../config/logger';
-import { checkDatabaseHealth } from '../services/healthService';
-import { checkRedisHealth } from '../services/healthService';
+const { Router } = require('express');
+const { logger } = require('../config/logger');
+const { checkDatabaseHealth, checkRedisHealth } = require('../services/healthService');
 
 const router = Router();
 
 // Health check endpoint
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', async (req, res) => {
   try {
     const startTime = Date.now();
     
@@ -68,7 +66,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Detailed health check
-router.get('/detailed', async (req: Request, res: Response) => {
+router.get('/detailed', async (req, res) => {
   try {
     const startTime = Date.now();
     
@@ -130,4 +128,4 @@ router.get('/detailed', async (req: Request, res: Response) => {
   }
 });
 
-export default router;
+module.exports = router;

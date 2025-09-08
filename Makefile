@@ -8,16 +8,17 @@ help:
 	@echo "Raspberry Pi 5 Hosting Platform - Available Commands:"
 	@echo ""
 	@echo "Setup & Deployment:"
-	@echo "  setup     - Initial setup and environment configuration"
-	@echo "  up        - Start all services in production mode"
-	@echo "  down      - Stop all services"
-	@echo "  restart   - Restart all services"
-	@echo "  update    - Update all services to latest versions"
+	@echo "  setup          - Initial setup and environment configuration"
+	@echo "  setup-services - Setup MongoDB and Redis natively on Pi"
+	@echo "  up             - Start production environment"
+	@echo "  dev            - Start development environment"
+	@echo "  down           - Stop all services"
+	@echo "  restart        - Restart all services"
+	@echo "  update         - Update all services to latest versions"
 	@echo ""
 	@echo "Development:"
-	@echo "  dev       - Start development environment"
-	@echo "  test      - Run tests"
-	@echo "  build     - Build all services"
+	@echo "  test           - Run tests"
+	@echo "  build          - Build all services"
 	@echo ""
 	@echo "Monitoring & Maintenance:"
 	@echo "  logs      - View logs from all services"
@@ -46,16 +47,22 @@ setup:
 	@mkdir -p logs backups scripts
 	@echo "Setup complete! Edit .env file and run 'make up' to start services."
 
+# Setup external services (MongoDB and Redis on Pi)
+setup-services:
+	@echo "Setting up MongoDB and Redis on Raspberry Pi..."
+	@./scripts/setup-services.sh
+	@echo "External services setup complete!"
+
 # Production deployment
 up:
 	@echo "Starting Raspberry Pi 5 Hosting Platform..."
-	@docker compose up -d
+	@docker compose -f docker-compose.yml up -d
 	@echo "Services started! Check status with 'make status'"
 
 # Development environment
 dev:
 	@echo "Starting development environment..."
-	@docker compose -f compose.dev.yaml up -d
+	@docker compose -f docker-compose.dev.yml up -d
 	@echo "Development environment started!"
 	@echo "Frontend: http://localhost:3000"
 	@echo "API: http://localhost:3001"

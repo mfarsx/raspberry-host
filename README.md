@@ -9,6 +9,23 @@ Internet → Caddy (HTTPS) → Express API ↔ MongoDB, Redis
                         → React Static Files
 ```
 
+## Project Structure
+
+```
+raspberry-host/
+├── api/                    # Node.js API backend
+│   ├── src/               # Source code
+│   └── Dockerfile         # Multi-stage container (dev + prod)
+├── web/                    # React frontend
+│   ├── src/               # Source code
+│   └── Dockerfile         # Multi-stage container (dev + prod)
+├── docker-compose.yml      # Production environment
+├── docker-compose.dev.yml  # Development environment
+├── Caddyfile              # Caddy reverse proxy config
+├── Makefile               # Build and deployment commands
+└── PROJECT_TODO.md        # Project status and tasks
+```
+
 ## Features
 
 - **Hosting Platform**: Complete infrastructure for hosting web applications
@@ -32,19 +49,36 @@ Internet → Caddy (HTTPS) → Express API ↔ MongoDB, Redis
 
 2. **Configure your environment**:
    ```bash
-   cp .env.example .env
-   # Edit .env with your domain and settings
+   # Create .env file with your configuration
+   cat > .env << EOF
+   DOMAIN=yourdomain.com
+   TLS_EMAIL=your-email@example.com
+   MONGO_ROOT_PASSWORD=your-mongo-password
+   REDIS_PASSWORD=your-redis-password
+   JWT_SECRET=your-jwt-secret-key
+   EOF
    ```
 
-3. **Initialize the hosting environment**:
+3. **Choose your environment**:
+
+   **Production Environment**
    ```bash
    make setup
-   ```
-
-4. **Start all hosting services**:
-   ```bash
    make up
    ```
+
+   **Development Environment**
+   ```bash
+   make dev
+   ```
+
+4. **Services started**:
+   - Caddy reverse proxy with automatic HTTPS
+   - Node.js API backend
+   - React frontend
+   - MongoDB database (Docker or native)
+   - Redis cache (Docker or native)
+   - Watchtower for automatic updates
 
 5. **Access your hosting platform** at `https://yourdomain.com`
 
@@ -125,22 +159,24 @@ This Raspberry Pi 5 hosting platform provides:
 This project is **production-ready** and fully functional! We've completed the core hosting platform infrastructure:
 
 ### ✅ Completed Phases: Core Infrastructure (Phase 1-4)
-- [x] **Docker Compose configuration** - ARM64 optimized
-- [x] **Caddy reverse proxy setup** - Automatic HTTPS
-- [x] **MongoDB and Redis configuration** - With authentication
-- [x] **Complete API and frontend** - Hosting management dashboard
-- [x] **Project deployment system** - Deploy from Git repositories
-- [x] **Multi-domain hosting** - Host multiple websites
-- [x] **Environment management** - Configure projects
-- [x] **Monitoring and logging** - Real-time project status
+- [x] **Docker Compose configuration** - ARM64 optimized with health checks
+- [x] **Caddy reverse proxy setup** - Automatic HTTPS with Let's Encrypt
+- [x] **MongoDB and Redis configuration** - With authentication and persistence
+- [x] **Complete API and frontend** - React dashboard with WebSocket support
+- [x] **Project deployment system** - Deploy from Git repositories with Docker
+- [x] **Multi-domain hosting** - Host multiple websites with SSL
+- [x] **Environment management** - Configure projects with variables
+- [x] **Real-time monitoring** - Live project status and logs
+- [x] **Project lifecycle management** - Start/stop/restart/delete projects
+- [x] **Container isolation** - Separate containers per project
 
-### 🚀 Ready for Production
+### 🚀 Current Status: Production Ready
 - **Phase 1-4**: Core Infrastructure ✅ **COMPLETED**
-- **Phase 5-6**: Advanced Monitoring & Security (Optional enhancements)
-- **Phase 7-9**: Enterprise Features (Optional additions)
+- **Phase 5-6**: Advanced Monitoring & Security 🔄 **IN PROGRESS**
+- **Phase 7-9**: Enterprise Features 📋 **PLANNED**
 
 ### 🎯 Progress Tracking
-See our [Project TODO](PROJECT_TODO.md) for detailed task breakdown and [Project Board](.github/project-board.md) for current status.
+See our [Project TODO](PROJECT_TODO.md) for detailed task breakdown and current status.
 
 ## 🤝 Contributing
 
@@ -152,38 +188,34 @@ We welcome contributions! Here's how to get started:
 3. **Follow our development workflow**:
    - Check the [Project TODO](PROJECT_TODO.md) for available tasks
    - Create a GitHub issue for your task
-   - Use our issue templates for consistency
 4. **Commit your changes**: `git commit -m 'Add amazing feature'`
 5. **Push to your branch**: `git push origin feature/amazing-feature`
 6. **Open a Pull Request**
 
 ### Development Workflow
-- **Issues**: Use our GitHub issue templates (Bug Report, Feature Request, Task)
-- **Labels**: We use labels for priority, phase, and status tracking
-- **Project Board**: Automated project management with GitHub Projects
+- **Issues**: Create GitHub issues for bugs and feature requests
+- **Labels**: Use labels for priority, phase, and status tracking
 - **Code Review**: All changes require review before merging
+- **Testing**: Run `make test` before submitting changes
 
 ### For Users
-- **Report bugs** using our Bug Report template
-- **Request features** using our Feature Request template
+- **Report bugs** by creating GitHub issues
+- **Request features** by creating GitHub issues
 - **Ask questions** in GitHub Discussions
 - **Share your setup** and experiences
 
 ## 📚 Documentation
 
 ### Quick Links
-- [📋 Project TODO](PROJECT_TODO.md) - Complete task breakdown
-- [📊 Project Board](.github/project-board.md) - Development workflow
-- [🐛 Issue Templates](.github/ISSUE_TEMPLATE/) - Bug reports and feature requests
+- [📋 Project TODO](PROJECT_TODO.md) - Complete task breakdown and current status
 
-### Detailed Documentation
-See the full documentation in the `docs/` directory for:
-- **Setup Instructions**: Detailed Raspberry Pi configuration
-- **Security Guidelines**: Best practices and hardening
-- **Deployment Procedures**: Production deployment steps
-- **Operational Procedures**: Monitoring, backups, and maintenance
-- **API Documentation**: Complete API reference
-- **Troubleshooting Guide**: Common issues and solutions
+### Available Commands
+Use `make help` to see all available commands:
+- **Setup**: `make setup` - Initial environment setup
+- **Production**: `make up` - Start production environment
+- **Development**: `make dev` - Start development environment with hot reload
+- **Monitoring**: `make logs`, `make status` - View logs and status
+- **Maintenance**: `make backup`, `make clean` - Backup and cleanup
 
 ## 🛠️ Development Setup
 
@@ -199,8 +231,15 @@ git clone https://github.com/mfarsx/raspberry-host.git
 cd raspberry-host
 
 # Set up environment
-cp .env.example .env
-# Edit .env with your local settings
+cat > .env << EOF
+DOMAIN=localhost
+TLS_EMAIL=dev@localhost
+MONGO_ROOT_PASSWORD=dev-password
+REDIS_PASSWORD=dev-password
+JWT_SECRET=dev-jwt-secret
+NODE_ENV=development
+DEV_MODE=true
+EOF
 
 # Start development environment
 make dev
@@ -215,34 +254,36 @@ make build
 ## 📈 Roadmap
 
 ### ✅ Completed (Core Platform)
-- ✅ Complete hosting infrastructure
-- ✅ Multi-domain hosting support
-- ✅ Project deployment from Git
-- ✅ Web management dashboard
-- ✅ Automatic SSL certificates
-- ✅ Real-time monitoring and logs
-- ✅ Docker container management
+- ✅ Complete hosting infrastructure with Docker Compose
+- ✅ Multi-domain hosting support with automatic SSL
+- ✅ Project deployment from Git repositories
+- ✅ React web management dashboard with WebSocket
+- ✅ Automatic SSL certificates via Let's Encrypt
+- ✅ Real-time monitoring and project logs
+- ✅ Docker container management and isolation
+- ✅ Environment variable management
+- ✅ Project lifecycle management (start/stop/restart/delete)
+- ✅ Health checks and container monitoring
 
-### 🔄 Optional Enhancements
-- **Advanced Security** - User authentication, RBAC
-- **Enhanced Monitoring** - Metrics, alerting, dashboards
+### 🔄 In Progress (Phase 5-6)
+- **Advanced Monitoring** - System metrics, alerting, dashboards
+- **Enhanced Security** - Authentication, RBAC, security headers
 - **Backup Automation** - Scheduled backups, disaster recovery
-- **Performance Optimization** - Caching, CDN integration
-- **Plugin System** - Extensible architecture
-- **API Management** - Rate limiting, API keys
+- **Performance Optimization** - Caching, resource optimization
 
-### 🚀 Future Features
+### 🚀 Future Features (Phase 7-9)
 - **Multi-tenant Support** - Multiple users/organizations
 - **Advanced Scaling** - Load balancing, auto-scaling
 - **Enterprise Features** - SSO, audit logs, compliance
+- **Plugin System** - Extensible architecture
 - **Marketplace** - Pre-built application templates
 
 ## 📞 Support
 
 - **GitHub Issues**: For bugs and feature requests
 - **GitHub Discussions**: For questions and community support
-- **Documentation**: Check the docs/ directory first
-- **Project Board**: Track development progress
+- **Project TODO**: Check [PROJECT_TODO.md](PROJECT_TODO.md) for current status
+- **Make Commands**: Use `make help` to see available commands
 
 ## 📄 License
 

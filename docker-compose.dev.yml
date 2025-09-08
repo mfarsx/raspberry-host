@@ -1,11 +1,13 @@
-version: '3.8'
+# Raspberry Pi 5 Hosting Platform - Development
+# Complete self-contained development setup with hot reload
 
 services:
   # Development API with hot reload
   api:
     build:
       context: ./api
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
+      target: development
       platforms:
         - linux/arm64
     container_name: pi-api-dev
@@ -22,6 +24,7 @@ services:
       - ./api:/app
       - /app/node_modules
       - api_logs:/app/logs
+      - api_uploads:/app/uploads
     ports:
       - "3001:3001"
     depends_on:
@@ -31,13 +34,13 @@ services:
         condition: service_healthy
     networks:
       - pi-network
-    command: npm run dev
 
   # Development Web with hot reload
   web:
     build:
       context: ./web
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
+      target: development
       platforms:
         - linux/arm64
     container_name: pi-web-dev
@@ -49,11 +52,11 @@ services:
     volumes:
       - ./web:/app
       - /app/node_modules
+      - web_cache:/app/node_modules/.cache
     ports:
       - "3000:3000"
     networks:
       - pi-network
-    command: npm start
 
   # Development MongoDB (no auth for simplicity)
   mongodb:
@@ -67,15 +70,15 @@ services:
       - mongodb_dev_config:/data/configdb
     ports:
       - "27017:27017"
-    networks:
-      - pi-network
     command: mongod --bind_ip_all
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 40s
+    networks:
+      - pi-network
 
   # Development Redis (no auth for simplicity)
   redis:
@@ -86,15 +89,15 @@ services:
       - redis_dev_data:/data
     ports:
       - "6379:6379"
-    networks:
-      - pi-network
     command: redis-server --appendonly yes
     healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
+    networks:
+      - pi-network
 
 volumes:
   mongodb_dev_data:
@@ -104,6 +107,10 @@ volumes:
   redis_dev_data:
     driver: local
   api_logs:
+    driver: local
+  api_uploads:
+    driver: local
+  web_cache:
     driver: local
 
 networks:
