@@ -13,8 +13,8 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=3001
-      - MONGO_URL=mongodb://pi_user:devpassword@mongodb:27017/pi_app_dev?authSource=pi_app_dev
-      - REDIS_URL=redis://:devpassword@redis:6379
+      - MONGO_URL=mongodb://mongodb:27017/pi_app_dev
+      - REDIS_URL=redis://redis:6379
       - JWT_SECRET=dev-jwt-secret-key
       - CORS_ORIGIN=http://localhost:3000
       - LOG_LEVEL=debug
@@ -70,6 +70,12 @@ services:
     networks:
       - pi-network
     command: mongod --bind_ip_all
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
 
   # Development Redis (no auth for simplicity)
   redis:
@@ -83,6 +89,12 @@ services:
     networks:
       - pi-network
     command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
 
 volumes:
   mongodb_dev_data:
