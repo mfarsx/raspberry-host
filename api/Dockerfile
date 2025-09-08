@@ -26,7 +26,8 @@ CMD ["npm", "run", "dev"]
 
 # Build stage
 FROM base AS build
-RUN npm ci --only=production && npm cache clean --force
+# Use npm install instead of npm ci for ARM64 compatibility
+RUN npm install --only=production && npm cache clean --force
 COPY . .
 RUN chown -R nodejs:nodejs /app
 USER nodejs

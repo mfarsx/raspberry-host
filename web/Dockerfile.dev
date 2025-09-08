@@ -16,7 +16,8 @@ RUN addgroup -g 1001 -S nodejs && \
 COPY package*.json ./
 
 # Install all dependencies (including dev dependencies)
-RUN npm ci
+# Use npm install instead of npm ci for ARM64 compatibility
+RUN npm install
 
 # Copy source code
 COPY . .
