@@ -1,76 +1,49 @@
-// MongoDB initialization script for Raspberry Pi 5 Hosting Platform
-// This script runs when MongoDB container starts for the first time
+// MongoDB initialization script for Raspberry Pi Hosting Platform
+// This script creates the application database and user
 
 // Switch to the application database
-db = db.getSiblingDB(process.env.MONGO_INITDB_DATABASE || 'pi_app');
+db = db.getSiblingDB('pi_app');
 
 // Create application user
 db.createUser({
   user: 'pi_user',
-  pwd: process.env.MONGO_ROOT_PASSWORD || 'defaultpassword',
+  pwd: 'devpassword', // This will be replaced by environment variable
   roles: [
     {
       role: 'readWrite',
-      db: process.env.MONGO_INITDB_DATABASE || 'pi_app'
+      db: 'pi_app'
     }
   ]
 });
 
-// Create initial collections with indexes
+// Create initial collections
+db.createCollection('projects');
 db.createCollection('users');
-db.createCollection('sessions');
-db.createCollection('applications');
-db.createCollection('logs');
+db.createCollection('deployments');
 
 // Create indexes for better performance
+db.projects.createIndex({ "name": 1 }, { unique: true });
+db.projects.createIndex({ "status": 1 });
+db.projects.createIndex({ "createdAt": 1 });
+db.projects.createIndex({ "updatedAt": 1 });
+
 db.users.createIndex({ "email": 1 }, { unique: true });
 db.users.createIndex({ "username": 1 }, { unique: true });
-db.users.createIndex({ "createdAt": 1 });
 
-db.sessions.createIndex({ "userId": 1 });
-db.sessions.createIndex({ "token": 1 }, { unique: true });
-db.sessions.createIndex({ "expiresAt": 1 }, { expireAfterSeconds: 0 });
+db.deployments.createIndex({ "projectId": 1 });
+db.deployments.createIndex({ "status": 1 });
+db.deployments.createIndex({ "createdAt": 1 });
 
-db.applications.createIndex({ "userId": 1 });
-db.applications.createIndex({ "name": 1 });
-db.applications.createIndex({ "createdAt": 1 });
-
-db.logs.createIndex({ "timestamp": 1 });
-db.logs.createIndex({ "level": 1 });
-db.logs.createIndex({ "service": 1 });
-
-// Insert initial admin user (password should be changed on first login)
-db.users.insertOne({
-  username: 'admin',
-  email: 'admin@localhost',
-  password: '$2b$10$rQZ8K9vJ8K9vJ8K9vJ8K9e', // bcrypt hash for 'admin123'
-  role: 'admin',
-  isActive: true,
-  createdAt: new Date(),
-  updatedAt: new Date()
-});
-
-// Insert system configuration
-db.createCollection('config');
-db.config.insertOne({
-  key: 'system',
-  value: {
-    version: '1.0.0',
-    initialized: true,
-    initializedAt: new Date(),
-    features: {
-      websocket: true,
-      authentication: true,
-      monitoring: true,
-      backup: true
-    }
-  },
+// Insert initial data
+db.projects.insertOne({
+  name: 'sample-website',
+  description: 'Sample website project',
+  repository: 'https://github.com/example/sample-website.git',
+  domain: 'sample.yourdomain.com',
+  port: 80,
+  status: 'stopped',
   createdAt: new Date(),
   updatedAt: new Date()
 });
 
 print('MongoDB initialization completed successfully!');
-print('Created collections: users, sessions, applications, logs, config');
-print('Created indexes for optimal performance');
-print('Created default admin user: admin / admin123');
-print('Please change the default admin password on first login!');

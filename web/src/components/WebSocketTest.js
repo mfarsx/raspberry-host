@@ -11,22 +11,35 @@ const WebSocketTest = ({ socket, connected }) => {
       socket.on('message', (data) => {
         setMessages(prev => [...prev, { 
           type: 'received', 
-          content: data, 
+          content: JSON.stringify(data), 
           timestamp: new Date().toLocaleTimeString() 
         }]);
       });
 
-      socket.on('test-result', (data) => {
-        setTestResults(prev => [...prev, { 
-          ...data, 
-          timestamp: new Date().toLocaleTimeString() 
-        }]);
-      });
-
-      socket.on('system-update', (data) => {
+      socket.on('echo', (data) => {
         setMessages(prev => [...prev, { 
-          type: 'system', 
-          content: `System Update: ${JSON.stringify(data)}`, 
+          type: 'echo', 
+          content: JSON.stringify(data), 
+          timestamp: new Date().toLocaleTimeString() 
+        }]);
+      });
+
+      socket.on('stats', (data) => {
+        setTestResults(prev => [...prev, { 
+          type: 'stats',
+          status: 'success',
+          message: `Connected clients: ${data.connectedClients}`,
+          latency: null,
+          timestamp: new Date().toLocaleTimeString() 
+        }]);
+      });
+
+      socket.on('pong', (data) => {
+        setTestResults(prev => [...prev, { 
+          type: 'ping',
+          status: 'success',
+          message: 'Pong received',
+          latency: Date.now() - data.timestamp,
           timestamp: new Date().toLocaleTimeString() 
         }]);
       });
@@ -41,8 +54,9 @@ const WebSocketTest = ({ socket, connected }) => {
 
       return () => {
         socket.off('message');
-        socket.off('test-result');
-        socket.off('system-update');
+        socket.off('echo');
+        socket.off('stats');
+        socket.off('pong');
         socket.off('error');
       };
     }
@@ -50,7 +64,7 @@ const WebSocketTest = ({ socket, connected }) => {
 
   const sendMessage = () => {
     if (socket && connected && messageInput.trim()) {
-      socket.emit('message', messageInput);
+      socket.emit('message', { message: messageInput });
       setMessages(prev => [...prev, { 
         type: 'sent', 
         content: messageInput, 
@@ -62,7 +76,13 @@ const WebSocketTest = ({ socket, connected }) => {
 
   const runTest = (testType) => {
     if (socket && connected) {
-      socket.emit('test', { type: testType });
+      if (testType === 'ping') {
+        socket.emit('ping');
+      } else if (testType === 'echo') {
+        socket.emit('echo', { message: 'Echo test message' });
+      } else if (testType === 'latency') {
+        socket.emit('stats');
+      }
     }
   };
 
@@ -85,13 +105,15 @@ const WebSocketTest = ({ socket, connected }) => {
         <div className="status-section">
           <h3>Connection Status</h3>
           <div className="status-indicator">
-            <span className={`status-dot ${connected ? 'connected' : 'disconnected'}`}></span>
+            <span className={`status-indicator ${connected ? 'status-online' : 'status-offline'}`}></span>
             <span>{connected ? 'Connected' : 'Disconnected'}</span>
           </div>
           {socket && (
             <div className="connection-info">
               <p><strong>Socket ID:</strong> {socket.id || 'N/A'}</p>
               <p><strong>Transport:</strong> {socket.io?.engine?.transport?.name || 'N/A'}</p>
+              <p><strong>URL:</strong> {socket.io?.uri || 'N/A'}</p>
+              <p><strong>Ready State:</strong> {socket.io?.engine?.readyState || 'N/A'}</p>
             </div>
           )}
         </div>
@@ -118,7 +140,7 @@ const WebSocketTest = ({ socket, connected }) => {
               onClick={() => runTest('latency')}
               disabled={!connected}
             >
-              Latency Test
+              Stats Test
             </button>
           </div>
         </div>

@@ -1,4 +1,4 @@
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
 const { logger } = require('../config/logger');
 const fs = require('fs').promises;
@@ -423,6 +423,312 @@ networks:
     } catch (error) {
       this.logger.error('Docker Compose is not available:', error);
       return false;
+    }
+  }
+
+  /**
+   * Get all Docker containers
+   * @returns {Promise<Array>} List of containers
+   */
+  async getAllContainers() {
+    try {
+      return new Promise((resolve, reject) => {
+        const child = spawn('docker', ['ps', '-a', '--format', 'json'], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000 // 30 seconds timeout
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        child.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const containers = stdout.split('\n')
+                .filter(line => line.trim())
+                .map(line => JSON.parse(line));
+              resolve(containers);
+            } catch (parseError) {
+              this.logger.error('Failed to parse containers:', parseError);
+              reject(new Error(`Failed to parse containers: ${parseError.message}`));
+            }
+          } else {
+            const error = new Error(`Failed to get containers with exit code ${code}: ${stderr}`);
+            this.logger.error('Failed to get containers:', error);
+            reject(error);
+          }
+        });
+        
+        child.on('error', (error) => {
+          this.logger.error('Failed to get containers:', error);
+          reject(new Error(`Failed to get containers: ${error.message}`));
+        });
+      });
+    } catch (error) {
+      this.logger.error('Failed to get containers:', error);
+      throw new Error(`Failed to get containers: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all Docker images
+   * @returns {Promise<Array>} List of images
+   */
+  async getAllImages() {
+    try {
+      return new Promise((resolve, reject) => {
+        const child = spawn('docker', ['images', '--format', 'json'], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000 // 30 seconds timeout
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        child.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const images = stdout.split('\n')
+                .filter(line => line.trim())
+                .map(line => JSON.parse(line));
+              resolve(images);
+            } catch (parseError) {
+              this.logger.error('Failed to parse images:', parseError);
+              reject(new Error(`Failed to parse images: ${parseError.message}`));
+            }
+          } else {
+            const error = new Error(`Failed to get images with exit code ${code}: ${stderr}`);
+            this.logger.error('Failed to get images:', error);
+            reject(error);
+          }
+        });
+        
+        child.on('error', (error) => {
+          this.logger.error('Failed to get images:', error);
+          reject(new Error(`Failed to get images: ${error.message}`));
+        });
+      });
+    } catch (error) {
+      this.logger.error('Failed to get images:', error);
+      throw new Error(`Failed to get images: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all Docker networks
+   * @returns {Promise<Array>} List of networks
+   */
+  async getAllNetworks() {
+    try {
+      return new Promise((resolve, reject) => {
+        const child = spawn('docker', ['network', 'ls', '--format', 'json'], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000 // 30 seconds timeout
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        child.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const networks = stdout.split('\n')
+                .filter(line => line.trim())
+                .map(line => JSON.parse(line));
+              resolve(networks);
+            } catch (parseError) {
+              this.logger.error('Failed to parse networks:', parseError);
+              reject(new Error(`Failed to parse networks: ${parseError.message}`));
+            }
+          } else {
+            const error = new Error(`Failed to get networks with exit code ${code}: ${stderr}`);
+            this.logger.error('Failed to get networks:', error);
+            reject(error);
+          }
+        });
+        
+        child.on('error', (error) => {
+          this.logger.error('Failed to get networks:', error);
+          reject(new Error(`Failed to get networks: ${error.message}`));
+        });
+      });
+    } catch (error) {
+      this.logger.error('Failed to get networks:', error);
+      throw new Error(`Failed to get networks: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all Docker volumes
+   * @returns {Promise<Array>} List of volumes
+   */
+  async getAllVolumes() {
+    try {
+      return new Promise((resolve, reject) => {
+        const child = spawn('docker', ['volume', 'ls', '--format', 'json'], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000 // 30 seconds timeout
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        child.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const volumes = stdout.split('\n')
+                .filter(line => line.trim())
+                .map(line => JSON.parse(line));
+              resolve(volumes);
+            } catch (parseError) {
+              this.logger.error('Failed to parse volumes:', parseError);
+              reject(new Error(`Failed to parse volumes: ${parseError.message}`));
+            }
+          } else {
+            const error = new Error(`Failed to get volumes with exit code ${code}: ${stderr}`);
+            this.logger.error('Failed to get volumes:', error);
+            reject(error);
+          }
+        });
+        
+        child.on('error', (error) => {
+          this.logger.error('Failed to get volumes:', error);
+          reject(new Error(`Failed to get volumes: ${error.message}`));
+        });
+      });
+    } catch (error) {
+      this.logger.error('Failed to get volumes:', error);
+      throw new Error(`Failed to get volumes: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get Docker system information
+   * @returns {Promise<Object>} System information
+   */
+  async getSystemInfo() {
+    try {
+      return new Promise((resolve, reject) => {
+        const child = spawn('docker', ['system', 'info', '--format', 'json'], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000 // 30 seconds timeout
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        child.on('close', (code) => {
+          if (code === 0) {
+            try {
+              const info = JSON.parse(stdout);
+              resolve(info);
+            } catch (parseError) {
+              this.logger.error('Failed to parse system info:', parseError);
+              reject(new Error(`Failed to parse system info: ${parseError.message}`));
+            }
+          } else {
+            const error = new Error(`Failed to get system info with exit code ${code}: ${stderr}`);
+            this.logger.error('Failed to get system info:', error);
+            reject(error);
+          }
+        });
+        
+        child.on('error', (error) => {
+          this.logger.error('Failed to get system info:', error);
+          reject(new Error(`Failed to get system info: ${error.message}`));
+        });
+      });
+    } catch (error) {
+      this.logger.error('Failed to get system info:', error);
+      throw new Error(`Failed to get system info: ${error.message}`);
+    }
+  }
+
+  /**
+   * Remove Docker image
+   * @param {string} imageId - Image ID or name
+   * @returns {Promise<void>}
+   */
+  async removeImage(imageId) {
+    try {
+      const sanitizedId = sanitizeCommandInput(imageId);
+      
+      return new Promise((resolve, reject) => {
+        const child = spawn('docker', ['rmi', sanitizedId], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 120000 // 2 minutes timeout
+        });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        child.on('close', (code) => {
+          if (code === 0) {
+            this.logger.info(`Docker image removed: ${sanitizedId}`);
+            resolve();
+          } else {
+            const error = new Error(`Failed to remove image with exit code ${code}: ${stderr}`);
+            this.logger.error('Failed to remove image:', error);
+            reject(error);
+          }
+        });
+        
+        child.on('error', (error) => {
+          this.logger.error('Failed to remove image:', error);
+          reject(new Error(`Failed to remove image: ${error.message}`));
+        });
+      });
+    } catch (error) {
+      this.logger.error('Failed to remove image:', error);
+      throw new Error(`Failed to remove image: ${error.message}`);
     }
   }
 }

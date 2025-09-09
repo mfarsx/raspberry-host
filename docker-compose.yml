@@ -11,7 +11,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./Caddyfile.dev:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
       - caddy_logs:/var/log/caddy
@@ -51,7 +51,9 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - MONGO_URL=${MONGO_URL:-mongodb://pi_user:${MONGO_ROOT_PASSWORD}@mongodb:27017/${MONGO_DATABASE:-pi_app}}
+      - MONGO_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
       - REDIS_URL=${REDIS_URL:-redis://:${REDIS_PASSWORD}@redis:6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGIN=${CORS_ORIGIN:-https://${DOMAIN}}
       - LOG_LEVEL=${LOG_LEVEL:-info}

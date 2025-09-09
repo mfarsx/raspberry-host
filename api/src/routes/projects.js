@@ -22,6 +22,36 @@ router.get('/',
   })
 );
 
+// Search projects (must come before /:id route)
+router.get('/search',
+  AuthMiddleware.verifyToken,
+  asyncHandler(async (req, res) => {
+    const { q, status, page = 1, limit = 10 } = req.query;
+    
+    const criteria = {};
+    if (q) criteria.search = q;
+    if (status) criteria.status = status;
+    
+    const projects = await projectService.searchProjects(criteria);
+    
+    // Simple pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedProjects = projects.slice(startIndex, endIndex);
+    
+    res.json({
+      success: true,
+      data: paginatedProjects,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: projects.length,
+        pages: Math.ceil(projects.length / limit)
+      }
+    });
+  })
+);
+
 // Get project by ID
 router.get('/:id', 
   AuthMiddleware.verifyToken,
@@ -188,6 +218,72 @@ router.get('/:id/status',
     res.json({
       success: true,
       data: status
+    });
+  })
+);
+
+// Get project statistics
+router.get('/stats/overview',
+  AuthMiddleware.verifyToken,
+  AuthMiddleware.requireRole('admin'),
+  asyncHandler(async (req, res) => {
+    const stats = await projectService.getProjectStatistics();
+    
+    res.json({
+      success: true,
+      data: stats
+    });
+  })
+);
+
+// Start project
+router.post('/:id/start',
+  AuthMiddleware.verifyToken,
+  AuthMiddleware.requireRole('admin'),
+  ValidationMiddleware.validateParams(projectSchemas.projectId),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const success = await projectService.startProject(id);
+    
+    if (!success) {
+      return res.status(404).json({
+        success: false,
+        error: 'Project not found',
+        category: 'NOT_FOUND'
+      });
+    }
+    
+    logger.info(`Project started: ${id}`);
+    
+    res.json({
+      success: true,
+      message: 'Project started successfully'
+    });
+  })
+);
+
+// Stop project
+router.post('/:id/stop',
+  AuthMiddleware.verifyToken,
+  AuthMiddleware.requireRole('admin'),
+  ValidationMiddleware.validateParams(projectSchemas.projectId),
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const success = await projectService.stopProject(id);
+    
+    if (!success) {
+      return res.status(404).json({
+        success: false,
+        error: 'Project not found',
+        category: 'NOT_FOUND'
+      });
+    }
+    
+    logger.info(`Project stopped: ${id}`);
+    
+    res.json({
+      success: true,
+      message: 'Project stopped successfully'
     });
   })
 );

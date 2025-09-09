@@ -17,7 +17,7 @@ services:
       - PORT=3001
       - MONGO_URL=mongodb://mongodb:27017/pi_app_dev
       - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=dev-jwt-secret-key
+      - JWT_SECRET=dev-jwt-secret-key-for-development-only-minimum-32-characters
       - CORS_ORIGIN=http://localhost:3000
       - LOG_LEVEL=debug
     volumes:
@@ -37,22 +37,17 @@ services:
 
   # Development Web with hot reload
   web:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-      target: development
-      platforms:
-        - linux/arm64
+    image: node:18-alpine
     container_name: pi-web-dev
     restart: unless-stopped
+    working_dir: /app
+    command: sh -c "npm install && npm start"
     environment:
       - REACT_APP_API_URL=http://localhost:3001/api
-      - REACT_APP_WS_URL=ws://localhost:3001/ws
+      - REACT_APP_WS_URL=ws://localhost:3001
       - REACT_APP_ENV=development
     volumes:
       - ./web:/app
-      - /app/node_modules
-      - web_cache:/app/node_modules/.cache
     ports:
       - "3000:3000"
     networks:

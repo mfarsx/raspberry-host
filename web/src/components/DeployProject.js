@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import apiClient from '../config/axios';
 import toast from 'react-hot-toast';
 import { 
   Upload, 

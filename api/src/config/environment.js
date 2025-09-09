@@ -107,7 +107,7 @@ class EnvironmentConfig {
 
   get corsOrigin() {
     if (this.isDevelopment) {
-      return process.env.CORS_ORIGIN || 'http://localhost:3000';
+      return process.env.CORS_ORIGIN || ['http://localhost:3000', 'http://localhost', 'http://localhost:80', 'http://localhost:443'];
     }
     return process.env.CORS_ORIGIN || `https://${this.domain}`;
   }

@@ -10,6 +10,9 @@ const { Server: SocketIOServer } = require('socket.io');
 const healthRoutes = require('./routes/health');
 const apiRoutes = require('./routes/api');
 const projectRoutes = require('./routes/projects');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/users');
+const dockerRoutes = require('./routes/docker');
 const { connectDatabase } = require('./config/database');
 const { connectRedis } = require('./config/redis');
 const { logger, requestLogger, performanceLogger } = require('./config/logger');
@@ -76,7 +79,10 @@ if (config.enableRateLimiting) {
 
 // Routes
 app.use('/api/health', healthRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/docker', dockerRoutes);
 app.use('/api', apiRoutes);
 
 // WebSocket setup

@@ -28,7 +28,7 @@ FROM base AS build
 RUN npm config set fetch-retry-mintimeout 20000 && \
     npm config set fetch-retry-maxtimeout 120000 && \
     npm config set fetch-retries 3 && \
-    npm install --only=production --no-audit --no-fund && \
+    npm install --no-audit --no-fund && \
     npm cache clean --force
 COPY . .
 RUN chown -R nodejs:nodejs /app

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import io from 'socket.io-client';
-import axios from 'axios';
 import { QueryClient, QueryClientProvider } from 'react-query';
 import toast from 'react-hot-toast';
+import apiClient from './config/axios';
 
 // Components
 import DashboardRefactored from './components/DashboardRefactored';
@@ -11,6 +11,7 @@ import ProjectManagement from './components/ProjectManagement';
 import DeployProject from './components/DeployProject';
 import SystemInfo from './components/SystemInfo';
 import WebSocketTest from './components/WebSocketTest';
+import Login from './components/Login';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -33,7 +34,7 @@ function App() {
     // Check API health
     const checkHealth = async () => {
       try {
-        const response = await axios.get('/api/health');
+        const response = await apiClient.get('/health');
         setApiHealth(response.data);
       } catch (error) {
         setApiHealth({ ok: false, error: error.message });
@@ -45,24 +46,43 @@ function App() {
     const healthInterval = setInterval(checkHealth, 30000); // Check every 30 seconds
 
     // Initialize WebSocket connection
-    const wsUrl = process.env.REACT_APP_WS_URL || 'ws://localhost:3001';
+    const wsUrl = process.env.REACT_APP_WS_URL || '/ws';
     const newSocket = io(wsUrl, {
-      transports: ['websocket'],
-      upgrade: false
+      transports: ['websocket', 'polling'],
+      upgrade: true,
+      rememberUpgrade: true,
+      timeout: 20000,
+      forceNew: true
     });
 
     newSocket.on('connect', () => {
       setSocketConnected(true);
       toast.success('WebSocket connected');
+      console.log('WebSocket connected:', newSocket.id);
     });
 
-    newSocket.on('disconnect', () => {
+    newSocket.on('disconnect', (reason) => {
       setSocketConnected(false);
-      toast.error('WebSocket disconnected');
+      toast.error(`WebSocket disconnected: ${reason}`);
+      console.log('WebSocket disconnected:', reason);
+    });
+
+    newSocket.on('connect_error', (error) => {
+      setSocketConnected(false);
+      toast.error(`WebSocket connection failed: ${error.message}`);
+      console.error('WebSocket connection error:', error);
     });
 
     newSocket.on('message', (data) => {
       console.log('Received message:', data);
+    });
+
+    newSocket.on('echo', (data) => {
+      console.log('Received echo:', data);
+    });
+
+    newSocket.on('stats', (data) => {
+      console.log('Received stats:', data);
     });
 
     setSocket(newSocket);
@@ -110,7 +130,8 @@ function App() {
 
           <main className="container">
             <Routes>
-              <Route path="/" element={<DashboardRefactored />} />
+              <Route path="/" element={<DashboardRefactored socketConnected={socketConnected} />} />
+              <Route path="/login" element={<Login />} />
               <Route path="/projects" element={<ProjectManagement />} />
               <Route path="/deploy" element={<DeployProject />} />
               <Route path="/websocket" element={<WebSocketTest socket={socket} connected={socketConnected} />} />

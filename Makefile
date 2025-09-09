@@ -15,15 +15,22 @@ help:
 	@echo "  down           - Stop all services"
 	@echo "  restart        - Restart all services"
 	@echo "  update         - Update all services to latest versions"
+	@echo "  deploy         - Full production deployment with health checks"
 	@echo ""
 	@echo "Development:"
 	@echo "  test           - Run tests"
 	@echo "  build          - Build all services"
+	@echo "  rebuild-web    - Rebuild web container with latest changes"
+	@echo "  fix-caddy      - Fix Caddy configuration issues"
 	@echo ""
 	@echo "Monitoring & Maintenance:"
 	@echo "  logs      - View logs from all services"
 	@echo "  status    - Check status of all services"
 	@echo "  clean     - Clean up unused containers and images"
+	@echo "  check-api - Test API endpoints connectivity"
+	@echo "  resources - Show resource usage"
+	@echo "  disk      - Show disk usage"
+	@echo "  network   - Show network information"
 	@echo ""
 	@echo "Backup & Recovery:"
 	@echo "  backup    - Create backup of all data"
@@ -32,6 +39,18 @@ help:
 	@echo "Security:"
 	@echo "  security  - Run security checks"
 	@echo "  scan      - Scan for vulnerabilities"
+	@echo ""
+	@echo "Emergency:"
+	@echo "  emergency-stop - Emergency stop all containers"
+	@echo "  reset-all     - Reset everything (removes all containers/images/volumes)"
+	@echo ""
+	@echo "Quick Commands:"
+	@echo "  quick-prod    - Quick production setup"
+	@echo "  system-check  - Full system health check"
+	@echo ""
+	@echo "Service-specific:"
+	@echo "  logs-<service>    - View logs for specific service"
+	@echo "  restart-<service> - Restart specific service"
 
 # Environment setup
 setup:
@@ -56,11 +75,22 @@ setup-services:
 # Production deployment
 up:
 	@echo "Starting Raspberry Pi 5 Hosting Platform..."
+	@echo "Stopping any running development services..."
+	@docker compose -f docker-compose.dev.yml down 2>/dev/null || echo "No development services to stop"
+	@echo "Starting production environment..."
 	@docker compose -f docker-compose.yml up -d
 	@echo "Services started! Check status with 'make status'"
 
 # Development environment
 dev:
+	@echo "Setting up development environment..."
+	@if [ ! -f .env ]; then \
+		echo "Creating .env file from template..."; \
+		cp .env.example .env; \
+		echo "Please edit .env file with your configuration"; \
+	fi
+	@echo "Stopping any running production services..."
+	@docker compose down 2>/dev/null || echo "No production services to stop"
 	@echo "Starting development environment..."
 	@docker compose -f docker-compose.dev.yml up -d
 	@echo "Development environment started!"
@@ -72,8 +102,9 @@ dev:
 # Stop services
 down:
 	@echo "Stopping all services..."
-	@docker compose down
-	@docker compose -f compose.dev.yaml down
+	@docker compose down 2>/dev/null || echo "No production services to stop"
+	@docker compose -f docker-compose.dev.yml down 2>/dev/null || echo "No development services to stop"
+	@echo "All services stopped!"
 
 # Restart services
 restart:
@@ -88,10 +119,26 @@ logs:
 # Check status
 status:
 	@echo "Checking service status..."
-	@docker compose ps
+	@echo "All running containers:"
+	@docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 	@echo ""
-	@echo "Health checks:"
-	@docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
+	@echo "Production services (docker-compose.yml):"
+	@docker compose ps 2>/dev/null || echo "No production services running"
+	@echo ""
+	@echo "Development services (docker-compose.dev.yml):"
+	@docker compose -f docker-compose.dev.yml ps 2>/dev/null || echo "No development services running"
+
+# Test API connectivity
+check-api:
+	@echo "Testing API endpoints..."
+	@echo "Testing /api/health..."
+	@curl -k -s https://localhost/api/health | jq .ok || echo "Health endpoint failed"
+	@echo ""
+	@echo "Testing /api/stats..."
+	@curl -k -s https://localhost/api/stats | jq .ok || echo "Stats endpoint failed"
+	@echo ""
+	@echo "Testing frontend..."
+	@curl -k -s -I https://localhost | grep "200 OK" || echo "Frontend failed"
 
 # Run tests
 test:
@@ -171,13 +218,17 @@ deploy:
 	@make status
 	@echo "Deployment complete!"
 
-# Quick development setup
-quick-dev:
-	@echo "Quick development setup..."
-	@cp .env.example .env
-	@sed -i 's/NODE_ENV=production/NODE_ENV=development/' .env
-	@sed -i 's/DEV_MODE=false/DEV_MODE=true/' .env
-	@make dev
+
+# Quick production setup
+quick-prod:
+	@echo "Quick production setup..."
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		echo "Created .env file from template"; \
+	fi
+	@sed -i 's/NODE_ENV=development/NODE_ENV=production/' .env 2>/dev/null || echo "NODE_ENV not found in .env"
+	@sed -i 's/DEV_MODE=true/DEV_MODE=false/' .env 2>/dev/null || echo "DEV_MODE not found in .env"
+	@make deploy
 
 # Show resource usage
 resources:
@@ -206,7 +257,44 @@ emergency-stop:
 	@docker stop $$(docker ps -q)
 	@echo "All containers stopped!"
 
+# Show logs for specific service
+logs-%:
+	@echo "Viewing logs for $* service..."
+	@docker compose logs -f $*
+
+# Restart specific service
+restart-%:
+	@echo "Restarting $* service..."
+	@docker compose restart $*
+
 # Show help for specific command
 help-%:
 	@echo "Help for $* command:"
 	@grep -A 5 "^$*:" Makefile || echo "Command not found"
+
+# Full system check
+system-check:
+	@echo "Running full system check..."
+	@echo "1. Checking Docker status..."
+	@docker --version
+	@echo ""
+	@echo "2. Checking service status..."
+	@make status
+	@echo ""
+	@echo "3. Testing API connectivity..."
+	@make check-api
+	@echo ""
+	@echo "4. Checking resource usage..."
+	@make resources
+	@echo ""
+	@echo "System check complete!"
+
+# Reset everything (nuclear option)
+reset-all:
+	@echo "WARNING: This will remove ALL containers, images, and volumes!"
+	@echo "Press Ctrl+C to cancel, or wait 10 seconds to continue..."
+	@sleep 10
+	@docker compose down -v
+	@docker system prune -af
+	@docker volume prune -f
+	@echo "System reset complete!"

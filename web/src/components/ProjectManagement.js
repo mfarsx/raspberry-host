@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import apiClient from '../config/axios';
 import { 
   Play, 
   Square, 
@@ -26,7 +27,7 @@ const ProjectManagement = () => {
 
   const fetchProjects = async () => {
     try {
-      const response = await axios.get('/api/projects');
+      const response = await apiClient.get('/projects');
       setProjects(response.data.data || []);
     } catch (error) {
       toast.error('Failed to fetch projects');
@@ -58,7 +59,7 @@ const ProjectManagement = () => {
   const handleDeleteProject = async (projectId) => {
     if (window.confirm('Are you sure you want to delete this project?')) {
       try {
-        await axios.delete(`/api/projects/${projectId}`);
+        await apiClient.delete(`/projects/${projectId}`);
         toast.success('Project deleted successfully');
         fetchProjects();
       } catch (error) {
@@ -69,7 +70,7 @@ const ProjectManagement = () => {
 
   const handleViewLogs = async (projectId) => {
     try {
-      const response = await axios.get(`/api/projects/${projectId}/logs`);
+      const response = await apiClient.get(`/projects/${projectId}/logs`);
       setLogs(response.data.data || []);
       setSelectedProject(projectId);
       setShowLogs(true);

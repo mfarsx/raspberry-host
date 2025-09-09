@@ -8,6 +8,73 @@ const ProjectRepository = require('./projectRepository');
 const { getCacheService } = require('./cacheService');
 
 /**
+ * In-memory project repository fallback when Redis is unavailable
+ */
+class InMemoryProjectRepository {
+  constructor() {
+    this.projects = new Map();
+    this.logger = logger;
+  }
+
+  async getAllProjects() {
+    return Array.from(this.projects.values());
+  }
+
+  async getProjectById(id) {
+    return this.projects.get(id) || null;
+  }
+
+  async saveProject(id, project) {
+    this.projects.set(id, project);
+    this.logger.info(`Project saved in memory: ${id}`);
+  }
+
+  async updateProject(id, updates) {
+    const existingProject = this.projects.get(id);
+    if (!existingProject) {
+      return null;
+    }
+
+    const updatedProject = {
+      ...existingProject,
+      ...updates,
+      updatedAt: new Date()
+    };
+
+    this.projects.set(id, updatedProject);
+    return updatedProject;
+  }
+
+  async deleteProject(id) {
+    const existed = this.projects.has(id);
+    this.projects.delete(id);
+    this.logger.info(`Project deleted from memory: ${id}`);
+    return existed;
+  }
+
+  async projectExists(id) {
+    return this.projects.has(id);
+  }
+
+  async getProjectCount() {
+    return this.projects.size;
+  }
+
+  async searchProjects(criteria) {
+    const allProjects = Array.from(this.projects.values());
+    
+    return allProjects.filter(project => {
+      return Object.entries(criteria).every(([key, value]) => {
+        if (typeof value === 'string') {
+          return project[key] && project[key].toLowerCase().includes(value.toLowerCase());
+        }
+        return project[key] === value;
+      });
+    });
+  }
+}
+
+/**
  * Project Service - Main service for project management
  * Uses dependency injection for better testability and separation of concerns
  */
@@ -33,8 +100,14 @@ class ProjectService {
    */
   getProjectRepository() {
     if (!this.projectRepository) {
-      const { getRedisClient } = require('../config/redis');
-      this.projectRepository = new ProjectRepository(getRedisClient());
+      try {
+        const { getRedisClient } = require('../config/redis');
+        const redisClient = getRedisClient();
+        this.projectRepository = new ProjectRepository(redisClient);
+      } catch (error) {
+        this.logger.warn('Redis not available, using in-memory project storage');
+        this.projectRepository = new InMemoryProjectRepository();
+      }
     }
     return this.projectRepository;
   }
@@ -307,6 +380,60 @@ class ProjectService {
     } catch (error) {
       this.logger.error('Failed to search projects:', error);
       return [];
+    }
+  }
+
+  /**
+   * Start a project
+   * @param {string} id - Project ID
+   * @returns {Promise<boolean>} Success status
+   */
+  async startProject(id) {
+    try {
+      const project = await this.getProjectById(id);
+      if (!project) return false;
+
+      const projectPath = path.join(this.projectsDir, project.name);
+      await this.dockerService.startProject(projectPath);
+
+      // Update project status
+      await this.getProjectRepository().updateProject(id, {
+        status: 'running',
+        updatedAt: new Date()
+      });
+
+      this.logger.info(`Project started: ${project.name}`);
+      return true;
+    } catch (error) {
+      this.logger.error('Failed to start project:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Stop a project
+   * @param {string} id - Project ID
+   * @returns {Promise<boolean>} Success status
+   */
+  async stopProject(id) {
+    try {
+      const project = await this.getProjectById(id);
+      if (!project) return false;
+
+      const projectPath = path.join(this.projectsDir, project.name);
+      await this.dockerService.stopProject(projectPath);
+
+      // Update project status
+      await this.getProjectRepository().updateProject(id, {
+        status: 'stopped',
+        updatedAt: new Date()
+      });
+
+      this.logger.info(`Project stopped: ${project.name}`);
+      return true;
+    } catch (error) {
+      this.logger.error('Failed to stop project:', error);
+      return false;
     }
   }
 }

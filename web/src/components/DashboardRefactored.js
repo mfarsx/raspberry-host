@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '../config/axios';
 import { 
   Server, 
   Database, 
@@ -15,17 +15,16 @@ import {
 /**
  * Refactored Dashboard component with better state management
  */
-const DashboardRefactored = () => {
+const DashboardRefactored = ({ socketConnected }) => {
   const [projects, setProjects] = useState([]);
   const [status, setStatus] = useState(null);
   const [projectsLoading, setProjectsLoading] = useState(true);
   const [statusLoading, setStatusLoading] = useState(true);
-  const [socketConnected, setSocketConnected] = useState(false);
 
   const fetchProjects = async () => {
     try {
       setProjectsLoading(true);
-      const response = await axios.get('/api/projects');
+      const response = await apiClient.get('/projects');
       setProjects(response.data.data || []);
     } catch (error) {
       console.error('Failed to fetch projects:', error);
@@ -37,7 +36,7 @@ const DashboardRefactored = () => {
   const fetchSystemStatus = async () => {
     try {
       setStatusLoading(true);
-      const response = await axios.get('/api/stats');
+      const response = await apiClient.get('/stats');
       setStatus(response.data);
     } catch (error) {
       console.error('Failed to fetch system status:', error);

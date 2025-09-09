@@ -18,11 +18,28 @@ router.get('/', (req, res) => {
   });
 });
 
+// Simple health check for clients
+router.get('/health-check', (req, res) => {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  res.json({
+    status: 'healthy',
+    environment: process.env.NODE_ENV || 'development',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    message: isDevelopment ? 'System running in development mode' : 'System running in production mode'
+  });
+});
+
 // System stats endpoint
 router.get('/stats', async (req, res) => {
   try {
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
     const stats = {
+      ok: true, // Always true for development mode
       timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
       system: {
         uptime: process.uptime(),
         memory: {
@@ -104,6 +121,77 @@ router.get('/system', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to get system information',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// System status endpoint
+router.get('/system/status', async (req, res) => {
+  try {
+    const DockerService = require('../services/dockerService');
+    const dockerService = new DockerService();
+    
+    const [dockerAvailable, dockerComposeAvailable] = await Promise.all([
+      dockerService.isDockerAvailable(),
+      dockerService.isDockerComposeAvailable()
+    ]);
+    
+    // Determine overall system health
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const overallHealthy = isDevelopment ? true : dockerAvailable && dockerComposeAvailable;
+    
+    const status = {
+      timestamp: new Date().toISOString(),
+      healthy: overallHealthy,
+      environment: process.env.NODE_ENV || 'development',
+      services: {
+        api: {
+          status: 'healthy',
+          uptime: process.uptime(),
+          memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB',
+          version: process.version
+        },
+        docker: {
+          status: dockerAvailable ? 'available' : (isDevelopment ? 'not_required' : 'unavailable'),
+          version: dockerAvailable ? 'installed' : (isDevelopment ? 'development_mode' : 'not installed'),
+          message: isDevelopment ? 'Docker not required in development mode' : undefined
+        },
+        dockerCompose: {
+          status: dockerComposeAvailable ? 'available' : (isDevelopment ? 'not_required' : 'unavailable'),
+          version: dockerComposeAvailable ? 'installed' : (isDevelopment ? 'development_mode' : 'not installed'),
+          message: isDevelopment ? 'Docker Compose not required in development mode' : undefined
+        },
+        database: {
+          status: 'development_mode',
+          message: 'Database connections skipped in development mode'
+        },
+        redis: {
+          status: 'development_mode',
+          message: 'Redis connections skipped in development mode'
+        }
+      },
+      system: {
+        platform: process.platform,
+        arch: process.arch,
+        nodeVersion: process.version,
+        uptime: process.uptime(),
+        memory: {
+          used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+          total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+          external: Math.round(process.memoryUsage().external / 1024 / 1024),
+          rss: Math.round(process.memoryUsage().rss / 1024 / 1024)
+        }
+      }
+    };
+    
+    logger.info('System status endpoint accessed');
+    res.json(status);
+  } catch (error) {
+    logger.error('System status endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get system status',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }

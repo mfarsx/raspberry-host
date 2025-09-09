@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '../config/axios';
 
 const SystemInfo = () => {
   const [systemInfo, setSystemInfo] = useState(null);
@@ -10,7 +10,7 @@ const SystemInfo = () => {
     const fetchSystemInfo = async () => {
       try {
         setLoading(true);
-        const response = await axios.get('/api/system-info');
+        const response = await apiClient.get('/system-info');
         setSystemInfo(response.data);
         setError(null);
       } catch (err) {
