@@ -1,52 +1,29 @@
-import React, { useState } from 'react';
-import apiClient from '../config/axios';
-import toast from 'react-hot-toast';
+'use client';
+
+import React, { useState, useCallback } from 'react';
 import { User, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLogin } from '../hooks/useAuth';
 
 const Login = () => {
-  const navigate = useNavigate();
+  const loginMutation = useLogin();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
 
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-  };
+  }, []);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = useCallback((e) => {
     e.preventDefault();
-    setLoading(true);
-
-    try {
-      const response = await apiClient.post('/auth/login', formData);
-      const { token, user } = response.data.data;
-      
-      // Store token in localStorage
-      localStorage.setItem('authToken', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      // Set default authorization header
-      apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      
-      toast.success(`Welcome back, ${user.username}!`);
-      
-      // Navigate to dashboard after successful login
-      navigate('/');
-    } catch (error) {
-      const errorMessage = error.response?.data?.error || 'Login failed';
-      toast.error(errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
+    loginMutation.mutate(formData);
+  }, [formData, loginMutation]);
 
   return (
     <div className="container" style={{ maxWidth: '400px', margin: '50px auto' }}>
@@ -139,24 +116,24 @@ const Login = () => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loginMutation.isPending}
             style={{
               width: '100%',
               padding: '12px',
-              background: loading ? '#ccc' : '#007bff',
+              background: loginMutation.isPending ? '#ccc' : '#007bff',
               color: 'white',
               border: 'none',
               borderRadius: '8px',
               fontSize: '16px',
               fontWeight: '500',
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: loginMutation.isPending ? 'not-allowed' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px'
             }}
           >
-            {loading ? (
+            {loginMutation.isPending ? (
               <>
                 <div className="spinner" style={{ width: '16px', height: '16px' }}></div>
                 Signing in...

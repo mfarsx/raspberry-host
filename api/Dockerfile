@@ -1,8 +1,13 @@
 # Node.js API - Multi-stage Dockerfile
 FROM node:18-alpine AS base
 
-# Install system dependencies
-RUN apk add --no-cache curl dumb-init && rm -rf /var/cache/apk/*
+# Install system dependencies including Git and Docker CLI
+RUN apk add --no-cache \
+    curl \
+    dumb-init \
+    git \
+    docker-cli \
+    && rm -rf /var/cache/apk/*
 
 # Create app directory and user
 WORKDIR /app

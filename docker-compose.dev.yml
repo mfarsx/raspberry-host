@@ -1,15 +1,13 @@
 # Raspberry Pi 5 Hosting Platform - Development
-# Complete self-contained development setup with hot reload
+# Simplified stable development setup
 
 services:
-  # Development API with hot reload
+  # Development API
   api:
     build:
       context: ./api
       dockerfile: Dockerfile
       target: development
-      platforms:
-        - linux/arm64
     container_name: pi-api-dev
     restart: unless-stopped
     environment:
@@ -25,6 +23,7 @@ services:
       - /app/node_modules
       - api_logs:/app/logs
       - api_uploads:/app/uploads
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "3001:3001"
     depends_on:
@@ -35,7 +34,7 @@ services:
     networks:
       - pi-network
 
-  # Development Web with hot reload
+  # Development Web
   web:
     image: node:18-alpine
     container_name: pi-web-dev
@@ -53,7 +52,7 @@ services:
     networks:
       - pi-network
 
-  # Development MongoDB (no auth for simplicity)
+  # Development MongoDB
   mongodb:
     image: mongo:7.0-jammy
     container_name: pi-mongodb-dev
@@ -75,7 +74,7 @@ services:
     networks:
       - pi-network
 
-  # Development Redis (no auth for simplicity)
+  # Development Redis
   redis:
     image: redis:7.2-alpine
     container_name: pi-redis-dev
@@ -104,8 +103,6 @@ volumes:
   api_logs:
     driver: local
   api_uploads:
-    driver: local
-  web_cache:
     driver: local
 
 networks:

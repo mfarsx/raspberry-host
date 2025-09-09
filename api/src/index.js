@@ -28,8 +28,10 @@ const server = createServer(app);
 const io = new SocketIOServer(server, {
   cors: {
     origin: config.corsOrigin,
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  allowEIO3: true
 });
 
 const PORT = config.port;
