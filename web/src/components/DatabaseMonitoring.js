@@ -23,7 +23,7 @@ const DatabaseMonitoring = () => {
   const fetchDatabaseInfo = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/api/health/detailed');
+      const response = await apiClient.get('/api/health');
       
       if (response.data.success) {
         setDbData(response.data.services.database);
