@@ -93,7 +93,7 @@ const UserManagement = () => {
 
   const handleAssignRoles = async (userId, roles) => {
     try {
-      await axios.post(`/api/users/${userId}/roles`, { roles });
+      await apiClient.post(`/users/${userId}/roles`, { roles });
       toast.success('Roles updated successfully');
       fetchUsers();
     } catch (error) {
