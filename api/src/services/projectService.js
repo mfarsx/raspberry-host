@@ -10,7 +10,7 @@ const {
 } = require("../utils/serviceErrors");
 const GitService = require("./gitService");
 const DockerService = require("./dockerService");
-const ProjectRepository = require("./projectRepository");
+const projectRepository = require("../repositories/projectRepository");
 const { getCacheService } = require("./cacheService");
 
 /**
@@ -105,23 +105,11 @@ class ProjectService extends BaseService {
   }
 
   /**
-   * Initialize project repository if not provided
-   * @returns {ProjectRepository} Project repository instance
+   * Get project repository (MongoDB-based)
+   * @returns {Object} Project repository instance
    */
   getProjectRepository() {
-    if (!this.projectRepository) {
-      try {
-        const { getRedisClient } = require("../config/redis");
-        const redisClient = getRedisClient();
-        this.projectRepository = new ProjectRepository(redisClient);
-      } catch (error) {
-        this.logger.warn(
-          "Redis not available, using in-memory project storage"
-        );
-        this.projectRepository = new InMemoryProjectRepository();
-      }
-    }
-    return this.projectRepository;
+    return projectRepository;
   }
 
   async ensureProjectsDirectory() {
@@ -147,8 +135,9 @@ class ProjectService extends BaseService {
         return cached;
       }
 
-      // Get from repository
-      const projects = await this.getProjectRepository().getAllProjects();
+      // Get from MongoDB repository
+      const result = await this.getProjectRepository().findAll(1, 1000); // Get all projects
+      const projects = result.projects || [];
 
       // Cache the result
       await this.cacheService.set(cacheKey, projects, 60); // Cache for 1 minute
@@ -167,7 +156,7 @@ class ProjectService extends BaseService {
    */
   async getProjectById(id) {
     try {
-      return await this.getProjectRepository().getProjectById(id);
+      return await this.getProjectRepository().findById(id);
     } catch (error) {
       this.logger.error("Failed to get project by ID:", error);
       return null;
@@ -201,8 +190,9 @@ class ProjectService extends BaseService {
         );
       }
 
-      // Store project in repository
-      await this.getProjectRepository().saveProject(id, project);
+      // Store project in MongoDB repository
+      const savedProject = await this.getProjectRepository().create(project);
+      project._id = savedProject._id;
 
       // Clone repository
       const projectPath = path.join(this.projectsDir, project.name);
@@ -227,22 +217,20 @@ class ProjectService extends BaseService {
       await this.dockerService.startProject(projectPath);
 
       // Update project status
-      project.status = "running";
-      project.updatedAt = new Date();
-      await this.getProjectRepository().saveProject(id, project);
+      await this.getProjectRepository().updateStatus(savedProject._id, "running");
 
       // Invalidate cache
       await this.cacheService.delete("projects:all");
       await this.cacheService.delete(`project:${id}`);
 
       this.logger.info(`Project deployed successfully: ${project.name}`);
-      return project;
+      return savedProject;
     } catch (error) {
       this.logger.error("Failed to deploy project:", error);
-      project.status = "error";
-      project.updatedAt = new Date();
-      project.error = error.message;
-      await this.getProjectRepository().saveProject(id, project);
+      // Update project status to error if we have a saved project
+      if (savedProject) {
+        await this.getProjectRepository().updateStatus(savedProject._id, "error");
+      }
       throw error;
     }
   }
@@ -255,7 +243,7 @@ class ProjectService extends BaseService {
    */
   async updateProject(id, updates) {
     try {
-      return await this.getProjectRepository().updateProject(id, updates);
+      return await this.getProjectRepository().update(id, updates);
     } catch (error) {
       this.logger.error("Failed to update project:", error);
       return null;
@@ -279,8 +267,8 @@ class ProjectService extends BaseService {
       // Remove project directory
       await fs.rm(projectPath, { recursive: true, force: true });
 
-      // Remove from repository
-      await this.getProjectRepository().deleteProject(id);
+      // Remove from MongoDB repository
+      await this.getProjectRepository().delete(id);
 
       this.logger.info(`Project deleted: ${project.name}`);
       return true;
@@ -305,10 +293,7 @@ class ProjectService extends BaseService {
       await this.dockerService.startProject(projectPath);
 
       // Update project status
-      await this.getProjectRepository().updateProject(id, {
-        status: "running",
-        lastDeployed: new Date(),
-      });
+      await this.getProjectRepository().updateStatus(id, "running");
 
       return true;
     } catch (error) {
@@ -402,7 +387,8 @@ class ProjectService extends BaseService {
    */
   async searchProjects(criteria) {
     try {
-      return await this.getProjectRepository().searchProjects(criteria);
+      const result = await this.getProjectRepository().findAll(1, 1000, criteria);
+      return result.projects || [];
     } catch (error) {
       this.logger.error("Failed to search projects:", error);
       return [];
@@ -423,10 +409,7 @@ class ProjectService extends BaseService {
       await this.dockerService.startProject(projectPath);
 
       // Update project status
-      await this.getProjectRepository().updateProject(id, {
-        status: "running",
-        updatedAt: new Date(),
-      });
+      await this.getProjectRepository().updateStatus(id, "running");
 
       this.logger.info(`Project started: ${project.name}`);
       return true;
@@ -450,10 +433,7 @@ class ProjectService extends BaseService {
       await this.dockerService.stopProject(projectPath);
 
       // Update project status
-      await this.getProjectRepository().updateProject(id, {
-        status: "stopped",
-        updatedAt: new Date(),
-      });
+      await this.getProjectRepository().updateStatus(id, "stopped");
 
       this.logger.info(`Project stopped: ${project.name}`);
       return true;

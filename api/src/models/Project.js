@@ -14,7 +14,7 @@ const projectSchema = new mongoose.Schema({
     required: true,
     trim: true,
     lowercase: true,
-    match: [/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.?[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*$/, 'Please enter a valid domain']
+    match: [/^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$/, 'Please enter a valid domain']
   },
   repository: {
     type: String,

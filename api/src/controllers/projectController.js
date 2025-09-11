@@ -93,25 +93,19 @@ class ProjectController {
         return ResponseHelper.conflict(res, "Project name already exists");
       }
 
-      // Create project in database
-      const project = await projectRepository.create(projectData);
-
-      // Deploy project using service
+      // Deploy project using service (which handles database creation)
       try {
-        await this.projectService.deployProject(project);
-        await projectRepository.updateStatus(project._id, 'running');
+        const deployedProject = await this.projectService.deployProject(projectData);
+        logger.info(`Project deployed: ${deployedProject.name} at ${deployedProject.domain}`);
+        return ResponseHelper.created(res, deployedProject, "Project deployed successfully");
       } catch (deployError) {
         logger.error('Deployment failed:', deployError);
-        await projectRepository.updateStatus(project._id, 'error');
-        throw deployError;
+        // The project service already handles error status updates
+        return ResponseHelper.serverError(res, deployError.message);
       }
-
-      logger.info(`Project deployed: ${project.name} at ${project.domain}`);
-
-      return ResponseHelper.created(res, project, "Project deployed successfully");
     } catch (error) {
       logger.error('Deploy project error:', error);
-      return ResponseHelper.internalError(res, "Failed to deploy project");
+      return ResponseHelper.serverError(res, "Failed to deploy project");
     }
   }
 
