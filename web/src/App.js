@@ -29,6 +29,7 @@ const SystemInfo = lazy(() => import("./components/SystemInfo"));
 const WebSocketTest = lazy(() => import("./components/WebSocketTest"));
 const Login = lazy(() => import("./components/Login"));
 const Register = lazy(() => import("./components/Register"));
+const DatabaseMonitoring = lazy(() => import("./components/DatabaseMonitoring"));
 
 // Create a client with modern TanStack Query v5 configuration
 const queryClient = new QueryClient({
@@ -81,6 +82,7 @@ const AppContent = () => {
       { path: "/", label: "Dashboard" },
       { path: "/projects", label: "Projects" },
       { path: "/deploy", label: "Deploy Project" },
+      { path: "/database", label: "Database" },
       { path: "/websocket", label: "WebSocket Test" },
       { path: "/system", label: "System Info" },
     ],
@@ -188,6 +190,14 @@ const AppContent = () => {
                 element={
                   <ProtectedRoute>
                     <WebSocketTest />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/database"
+                element={
+                  <ProtectedRoute>
+                    <DatabaseMonitoring />
                   </ProtectedRoute>
                 }
               />

@@ -5,15 +5,6 @@ const DockerService = require('./dockerService');
 
 const checkDatabaseHealth = async () => {
   try {
-    // In development mode, skip database checks
-    if (process.env.NODE_ENV === 'development') {
-      return {
-        connected: true,
-        status: 'development_mode',
-        message: 'Database connections skipped in development mode'
-      };
-    }
-    
     // Check MongoDB connection
     const state = mongoose.connection.readyState;
     
@@ -32,20 +23,34 @@ const checkDatabaseHealth = async () => {
     
     // Get document count for each collection
     let totalDocuments = 0;
+    const collectionStats = {};
+    
     for (const collection of collections) {
       try {
         const count = await db.collection(collection.name).countDocuments();
         totalDocuments += count;
+        collectionStats[collection.name] = count;
       } catch (error) {
         logger.warn(`Could not count documents in collection ${collection.name}:`, error);
+        collectionStats[collection.name] = 0;
       }
     }
+    
+    // Get database size info
+    const dbStats = await db.stats();
     
     return {
       connected: true,
       status: 'connected',
       collections: collectionCount,
-      documents: totalDocuments
+      documents: totalDocuments,
+      collectionStats,
+      databaseSize: {
+        dataSize: dbStats.dataSize || 0,
+        storageSize: dbStats.storageSize || 0,
+        indexSize: dbStats.indexSize || 0
+      },
+      environment: process.env.NODE_ENV || 'development'
     };
     
   } catch (error) {
@@ -60,15 +65,6 @@ const checkDatabaseHealth = async () => {
 
 const checkRedisHealth = async () => {
   try {
-    // In development mode, skip Redis checks
-    if (process.env.NODE_ENV === 'development') {
-      return {
-        connected: true,
-        status: 'development_mode',
-        message: 'Redis connections skipped in development mode'
-      };
-    }
-    
     const redisClient = getRedisClient();
     
     // Check if Redis is connected
@@ -83,6 +79,7 @@ const checkRedisHealth = async () => {
     // Get Redis info
     const info = await redisClient.info('clients');
     const memoryInfo = await redisClient.info('memory');
+    const serverInfo = await redisClient.info('server');
     
     // Parse client info
     const connectedClientsMatch = info.match(/connected_clients:(\d+)/);
@@ -92,11 +89,29 @@ const checkRedisHealth = async () => {
     const memoryUsedMatch = memoryInfo.match(/used_memory_human:([^\r\n]+)/);
     const memoryUsed = memoryUsedMatch?.[1] || 'Unknown';
     
+    const memoryPeakMatch = memoryInfo.match(/used_memory_peak_human:([^\r\n]+)/);
+    const memoryPeak = memoryPeakMatch?.[1] || 'Unknown';
+    
+    // Parse server info
+    const redisVersionMatch = serverInfo.match(/redis_version:([^\r\n]+)/);
+    const redisVersion = redisVersionMatch?.[1] || 'Unknown';
+    
+    const uptimeMatch = serverInfo.match(/uptime_in_seconds:(\d+)/);
+    const uptimeSeconds = uptimeMatch?.[1] ? parseInt(uptimeMatch[1]) : 0;
+    
+    // Get key count
+    const dbSize = await redisClient.dbSize();
+    
     return {
       connected: true,
       status: 'connected',
       connectedClients,
-      memoryUsed: memoryUsed || 'Unknown'
+      memoryUsed: memoryUsed || 'Unknown',
+      memoryPeak: memoryPeak || 'Unknown',
+      redisVersion: redisVersion || 'Unknown',
+      uptimeSeconds,
+      keyCount: dbSize,
+      environment: process.env.NODE_ENV || 'development'
     };
     
   } catch (error) {
