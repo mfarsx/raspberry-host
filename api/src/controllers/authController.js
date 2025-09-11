@@ -3,275 +3,294 @@ const jwt = require("jsonwebtoken");
 const { logger, securityLogger } = require("../config/logger");
 const config = require("../config/environment");
 const ResponseHelper = require("../utils/responseHelper");
+const userRepository = require("../repositories/userRepository");
 
 class AuthController {
   constructor() {
-    // Mock user database (in production, this would be MongoDB)
-    this.users = [
-      {
-        id: "1",
-        username: "admin",
-        email: "admin@example.com",
-        password: "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // password
-        roles: ["admin"],
-        createdAt: new Date(),
-        lastLogin: null,
-      },
-    ];
+    // Initialize default admin user if needed
+    this.initializeDefaultAdmin();
+  }
+
+  /**
+   * Initialize default admin user
+   */
+  async initializeDefaultAdmin() {
+    try {
+      await userRepository.createAdminIfNotExists();
+    } catch (error) {
+      logger.error('Failed to initialize default admin:', error);
+    }
   }
 
   /**
    * User registration
    */
   async register(req, res) {
-    const { username, email, password } = req.body;
+    try {
+      const { username, email, password } = req.body;
 
-    // Check if user already exists
-    const existingUser = this.users.find(
-      (u) => u.email === email || u.username === username
-    );
-    if (existingUser) {
-      return ResponseHelper.conflict(res, "User already exists");
+      // Check if user already exists
+      const emailExists = await userRepository.emailExists(email);
+      const usernameExists = await userRepository.usernameExists(username);
+      
+      if (emailExists || usernameExists) {
+        return ResponseHelper.conflict(res, "User already exists");
+      }
+
+      // Create user
+      const user = await userRepository.create({
+        username,
+        email,
+        password,
+        roles: ["user"]
+      });
+
+      logger.info(`User registered: ${username} (${email})`);
+
+      return ResponseHelper.created(
+        res,
+        {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          roles: user.roles,
+          createdAt: user.createdAt,
+        },
+        "User registered successfully"
+      );
+    } catch (error) {
+      logger.error('Registration error:', error);
+      return ResponseHelper.internalError(res, "Registration failed");
     }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user
-    const user = {
-      id: (this.users.length + 1).toString(),
-      username,
-      email,
-      password: hashedPassword,
-      roles: ["user"],
-      createdAt: new Date(),
-      lastLogin: null,
-    };
-
-    this.users.push(user);
-
-    logger.info(`User registered: ${username} (${email})`);
-
-    return ResponseHelper.created(
-      res,
-      {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        roles: user.roles,
-        createdAt: user.createdAt,
-      },
-      "User registered successfully"
-    );
   }
 
   /**
    * User login
    */
   async login(req, res) {
-    const { email, password } = req.body;
+    try {
+      const { email, password } = req.body;
 
-    // Find user
-    const user = this.users.find((u) => u.email === email);
-    if (!user) {
-      securityLogger.suspiciousActivity(req.ip, "login_user_not_found", {
-        email,
-        endpoint: req.path,
-      });
-      return ResponseHelper.unauthorized(
-        res,
-        "Invalid credentials",
-        "AUTH_ERROR"
-      );
-    }
+      // Find user
+      const user = await userRepository.findByEmail(email);
+      if (!user) {
+        securityLogger.suspiciousActivity(req.ip, "login_user_not_found", {
+          email,
+          endpoint: req.path,
+        });
+        return ResponseHelper.unauthorized(
+          res,
+          "Invalid credentials",
+          "AUTH_ERROR"
+        );
+      }
 
-    // Check password
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
-      securityLogger.suspiciousActivity(req.ip, "login_invalid_password", {
-        email,
-        endpoint: req.path,
-      });
-      return ResponseHelper.unauthorized(
-        res,
-        "Invalid credentials",
-        "AUTH_ERROR"
-      );
-    }
+      // Check password
+      const isValidPassword = await user.comparePassword(password);
+      if (!isValidPassword) {
+        securityLogger.suspiciousActivity(req.ip, "login_invalid_password", {
+          email,
+          endpoint: req.path,
+        });
+        return ResponseHelper.unauthorized(
+          res,
+          "Invalid credentials",
+          "AUTH_ERROR"
+        );
+      }
 
-    // Update last login
-    user.lastLogin = new Date();
+      // Update last login
+      await userRepository.updateLastLogin(user._id);
 
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        roles: user.roles,
-      },
-      config.jwtSecret,
-      { expiresIn: "24h" }
-    );
-
-    logger.info(`User logged in: ${user.username} (${user.email})`);
-
-    return ResponseHelper.success(
-      res,
-      {
-        token,
-        user: {
-          id: user.id,
+      // Generate JWT token
+      const token = jwt.sign(
+        {
+          id: user._id,
           username: user.username,
           email: user.email,
           roles: user.roles,
-          lastLogin: user.lastLogin,
         },
-      },
-      { message: "Login successful" }
-    );
+        config.jwtSecret,
+        { expiresIn: "24h" }
+      );
+
+      logger.info(`User logged in: ${user.username} (${user.email})`);
+
+      return ResponseHelper.success(
+        res,
+        {
+          token,
+          user: {
+            id: user._id,
+            username: user.username,
+            email: user.email,
+            roles: user.roles,
+            lastLogin: new Date(),
+          },
+        },
+        { message: "Login successful" }
+      );
+    } catch (error) {
+      logger.error('Login error:', error);
+      return ResponseHelper.internalError(res, "Login failed");
+    }
   }
 
   /**
    * Get current user profile
    */
   async getCurrentUser(req, res) {
-    const user = this.users.find((u) => u.id === req.user.id);
-    if (!user) {
-      return ResponseHelper.notFound(res, "User not found", "NOT_FOUND");
-    }
+    try {
+      const user = await userRepository.findById(req.user.id);
+      if (!user) {
+        return ResponseHelper.notFound(res, "User not found", "NOT_FOUND");
+      }
 
-    return ResponseHelper.success(res, {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      roles: user.roles,
-      createdAt: user.createdAt,
-      lastLogin: user.lastLogin,
-    });
+      return ResponseHelper.success(res, {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        roles: user.roles,
+        createdAt: user.createdAt,
+        lastLogin: user.lastLogin,
+      });
+    } catch (error) {
+      logger.error('Get current user error:', error);
+      return ResponseHelper.internalError(res, "Failed to get user profile");
+    }
   }
 
   /**
    * Update user profile
    */
   async updateProfile(req, res) {
-    const user = this.users.find((u) => u.id === req.user.id);
-    if (!user) {
-      return ResponseHelper.notFound(res, "User not found", "NOT_FOUND");
-    }
+    try {
+      const { username, email } = req.body;
 
-    const { username, email } = req.body;
-
-    // Check if username/email is already taken by another user
-    if (username && username !== user.username) {
-      const existingUser = this.users.find(
-        (u) => u.username === username && u.id !== user.id
-      );
-      if (existingUser) {
-        return ResponseHelper.conflict(res, "Username already taken");
+      // Check if username/email is already taken by another user
+      if (username) {
+        const usernameExists = await userRepository.usernameExists(username);
+        if (usernameExists) {
+          return ResponseHelper.conflict(res, "Username already taken");
+        }
       }
-      user.username = username;
-    }
 
-    if (email && email !== user.email) {
-      const existingUser = this.users.find(
-        (u) => u.email === email && u.id !== user.id
-      );
-      if (existingUser) {
-        return ResponseHelper.conflict(res, "Email already taken");
+      if (email) {
+        const emailExists = await userRepository.emailExists(email);
+        if (emailExists) {
+          return ResponseHelper.conflict(res, "Email already taken");
+        }
       }
-      user.email = email;
+
+      const user = await userRepository.update(req.user.id, { username, email });
+      if (!user) {
+        return ResponseHelper.notFound(res, "User not found", "NOT_FOUND");
+      }
+
+      logger.info(`User profile updated: ${user.username} (${user.email})`);
+
+      return ResponseHelper.success(
+        res,
+        {
+          id: user._id,
+          username: user.username,
+          email: user.email,
+          roles: user.roles,
+          createdAt: user.createdAt,
+          lastLogin: user.lastLogin,
+        },
+        { message: "Profile updated successfully" }
+      );
+    } catch (error) {
+      logger.error('Update profile error:', error);
+      return ResponseHelper.internalError(res, "Failed to update profile");
     }
-
-    logger.info(`User profile updated: ${user.username} (${user.email})`);
-
-    return ResponseHelper.success(
-      res,
-      {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        roles: user.roles,
-        createdAt: user.createdAt,
-        lastLogin: user.lastLogin,
-      },
-      { message: "Profile updated successfully" }
-    );
   }
 
   /**
    * Change password
    */
   async changePassword(req, res) {
-    const user = this.users.find((u) => u.id === req.user.id);
-    if (!user) {
-      return ResponseHelper.notFound(res, "User not found");
+    try {
+      const { currentPassword, newPassword } = req.body;
+
+      const user = await userRepository.findById(req.user.id);
+      if (!user) {
+        return ResponseHelper.notFound(res, "User not found");
+      }
+
+      // Verify current password
+      const isValidPassword = await user.comparePassword(currentPassword);
+      if (!isValidPassword) {
+        securityLogger.suspiciousActivity(
+          req.ip,
+          "password_change_invalid_current",
+          {
+            userId: user._id,
+            endpoint: req.path,
+          }
+        );
+        return ResponseHelper.unauthorized(
+          res,
+          "Current password is incorrect",
+          "AUTH_ERROR"
+        );
+      }
+
+      // Update password
+      await userRepository.updatePassword(user._id, newPassword);
+
+      logger.info(`Password changed for user: ${user.username}`);
+
+      return ResponseHelper.success(res, null, {
+        message: "Password changed successfully",
+      });
+    } catch (error) {
+      logger.error('Change password error:', error);
+      return ResponseHelper.internalError(res, "Failed to change password");
     }
-
-    const { currentPassword, newPassword } = req.body;
-
-    // Verify current password
-    const isValidPassword = await bcrypt.compare(
-      currentPassword,
-      user.password
-    );
-    if (!isValidPassword) {
-      securityLogger.suspiciousActivity(
-        req.ip,
-        "password_change_invalid_current",
-        {
-          userId: user.id,
-          endpoint: req.path,
-        }
-      );
-      return ResponseHelper.unauthorized(
-        res,
-        "Current password is incorrect",
-        "AUTH_ERROR"
-      );
-    }
-
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-    user.password = hashedPassword;
-
-    logger.info(`Password changed for user: ${user.username}`);
-
-    return ResponseHelper.success(res, null, {
-      message: "Password changed successfully",
-    });
   }
 
   /**
    * Refresh token
    */
   async refreshToken(req, res) {
-    // Generate new token
-    const token = jwt.sign(
-      {
-        id: req.user.id,
-        username: req.user.username,
-        email: req.user.email,
-        roles: req.user.roles,
-      },
-      config.jwtSecret,
-      { expiresIn: "24h" }
-    );
+    try {
+      // Generate new token
+      const token = jwt.sign(
+        {
+          id: req.user.id,
+          username: req.user.username,
+          email: req.user.email,
+          roles: req.user.roles,
+        },
+        config.jwtSecret,
+        { expiresIn: "24h" }
+      );
 
-    return ResponseHelper.success(res, { token }, {
-      message: "Token refreshed successfully",
-    });
+      return ResponseHelper.success(res, { token }, {
+        message: "Token refreshed successfully",
+      });
+    } catch (error) {
+      logger.error('Refresh token error:', error);
+      return ResponseHelper.internalError(res, "Failed to refresh token");
+    }
   }
 
   /**
    * Logout (client-side token invalidation)
    */
   async logout(req, res) {
-    logger.info(`User logged out: ${req.user.username} (${req.user.email})`);
+    try {
+      logger.info(`User logged out: ${req.user.username} (${req.user.email})`);
 
-    return ResponseHelper.success(res, null, {
-      message: "Logged out successfully",
-    });
+      return ResponseHelper.success(res, null, {
+        message: "Logged out successfully",
+      });
+    } catch (error) {
+      logger.error('Logout error:', error);
+      return ResponseHelper.internalError(res, "Logout failed");
+    }
   }
 }
 

@@ -1,6 +1,7 @@
 const { logger } = require("../config/logger");
 const ResponseHelper = require("../utils/responseHelper");
 const { ProjectService } = require("../services/projectService");
+const projectRepository = require("../repositories/projectRepository");
 
 class ProjectController {
   constructor() {
@@ -11,8 +12,19 @@ class ProjectController {
    * Get all hosted projects
    */
   async getAllProjects(req, res) {
-    const projects = await this.projectService.getAllProjects();
-    return ResponseHelper.successWithCount(res, projects);
+    try {
+      const { page = 1, limit = 10, status, search } = req.query;
+      const filters = {};
+      
+      if (status) filters.status = status;
+      if (search) filters.search = search;
+      
+      const result = await projectRepository.findAll(page, limit, filters);
+      return ResponseHelper.successWithPagination(res, result.projects, result.pagination);
+    } catch (error) {
+      logger.error('Get all projects error:', error);
+      return ResponseHelper.internalError(res, "Failed to get projects");
+    }
   }
 
   /**
@@ -44,25 +56,63 @@ class ProjectController {
    * Get project by ID
    */
   async getProjectById(req, res) {
-    const { id } = req.params;
-    const project = await this.projectService.getProjectById(id);
+    try {
+      const { id } = req.params;
+      const project = await projectRepository.findById(id);
 
-    if (!project) {
-      return ResponseHelper.notFound(res, "Project not found");
+      if (!project) {
+        return ResponseHelper.notFound(res, "Project not found");
+      }
+
+      return ResponseHelper.success(res, project);
+    } catch (error) {
+      logger.error('Get project by ID error:', error);
+      return ResponseHelper.internalError(res, "Failed to get project");
     }
-
-    return ResponseHelper.success(res, project);
   }
 
   /**
    * Deploy new project
    */
   async deployProject(req, res) {
-    const project = await this.projectService.deployProject(req.body);
+    try {
+      const projectData = {
+        ...req.body,
+        createdBy: req.user.id
+      };
 
-    logger.info(`Project deployed: ${req.body.name} at ${req.body.domain}`);
+      // Check if domain is available
+      const domainAvailable = await projectRepository.isDomainAvailable(projectData.domain);
+      if (!domainAvailable) {
+        return ResponseHelper.conflict(res, "Domain already in use");
+      }
 
-    return ResponseHelper.created(res, project, "Project deployed successfully");
+      // Check if project name is available
+      const nameAvailable = await projectRepository.isNameAvailable(projectData.name);
+      if (!nameAvailable) {
+        return ResponseHelper.conflict(res, "Project name already exists");
+      }
+
+      // Create project in database
+      const project = await projectRepository.create(projectData);
+
+      // Deploy project using service
+      try {
+        await this.projectService.deployProject(project);
+        await projectRepository.updateStatus(project._id, 'running');
+      } catch (deployError) {
+        logger.error('Deployment failed:', deployError);
+        await projectRepository.updateStatus(project._id, 'error');
+        throw deployError;
+      }
+
+      logger.info(`Project deployed: ${project.name} at ${project.domain}`);
+
+      return ResponseHelper.created(res, project, "Project deployed successfully");
+    } catch (error) {
+      logger.error('Deploy project error:', error);
+      return ResponseHelper.internalError(res, "Failed to deploy project");
+    }
   }
 
   /**

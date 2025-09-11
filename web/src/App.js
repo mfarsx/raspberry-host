@@ -28,6 +28,7 @@ const DeployProject = lazy(() => import("./components/DeployProject"));
 const SystemInfo = lazy(() => import("./components/SystemInfo"));
 const WebSocketTest = lazy(() => import("./components/WebSocketTest"));
 const Login = lazy(() => import("./components/Login"));
+const Register = lazy(() => import("./components/Register"));
 
 // Create a client with modern TanStack Query v5 configuration
 const queryClient = new QueryClient({
@@ -157,6 +158,7 @@ const AppContent = () => {
           >
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
               <Route
                 path="/"
                 element={

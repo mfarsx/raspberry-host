@@ -1,0 +1,53 @@
+# Development Caddyfile for Raspberry Pi Hosting Platform
+# This file is used for development environment
+
+localhost {
+    # For development, use HTTP only
+    # No TLS for localhost development
+    
+    # Security headers (relaxed for development)
+    header {
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        X-Frame-Options "SAMEORIGIN"
+        -Server
+    }
+
+    # WebSocket proxy for development
+    reverse_proxy /ws* api:3001
+
+    # API routes
+    reverse_proxy /api* api:3001
+
+    # Serve React app (development mode)
+    reverse_proxy /* web:3000
+
+    # Logging for development
+    log {
+        output stdout
+        format console
+        level DEBUG
+    }
+}
+
+# Development subdomain support (optional)
+*.localhost {
+    # For testing subdomains in development
+    # You can add specific subdomain handling here
+    
+    # WebSocket proxy
+    reverse_proxy /ws* api:3001
+
+    # API routes
+    reverse_proxy /api* api:3001
+
+    # Serve React app
+    reverse_proxy /* web:3000
+
+    # Development logging
+    log {
+        output stdout
+        format console
+        level DEBUG
+    }
+}

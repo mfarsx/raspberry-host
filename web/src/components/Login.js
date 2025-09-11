@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import apiClient from '../config/axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -136,6 +136,15 @@ const Login = () => {
           </button>
         </div>
       </form>
+
+      <div className="mt-6 text-center">
+        <p className="text-gray-600">
+          Don't have an account?{' '}
+          <Link to="/register" className="text-blue-600 hover:text-blue-800">
+            Create one here
+          </Link>
+        </p>
+      </div>
 
       <div className="mt-6 p-4 bg-blue-50 rounded-lg">
         <h4 className="font-semibold mb-2 text-blue-800">Demo Credentials</h4>
