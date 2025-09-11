@@ -75,3 +75,6 @@ backups/
 # SSL certificates (if stored locally)
 ssl/
 certs/
+
+# Projects directory (user-generated content)
+api/projects/
