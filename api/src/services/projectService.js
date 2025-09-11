@@ -179,6 +179,7 @@ class ProjectService extends BaseService {
       lastDeployed: new Date(),
     };
 
+    let savedProject = null;
     try {
       // Validate repository before starting deployment
       const isValidRepo = await this.gitService.validateRepository(
@@ -191,7 +192,7 @@ class ProjectService extends BaseService {
       }
 
       // Store project in MongoDB repository
-      const savedProject = await this.getProjectRepository().create(project);
+      savedProject = await this.getProjectRepository().create(project);
       project._id = savedProject._id;
 
       // Clone repository

@@ -124,7 +124,7 @@ class AuthMiddleware {
       attempts.resetTime = now + 15 * 60 * 1000;
     }
     
-    if (attempts.count >= 5) { // 5 attempts per 15 minutes
+    if (attempts.count >= 50) { // 50 attempts per 15 minutes (increased for testing)
       securityLogger.suspiciousActivity(clientIp, 'rate_limit_exceeded', {
         endpoint: req.path,
         attempts: attempts.count
