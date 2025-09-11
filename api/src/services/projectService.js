@@ -1,11 +1,17 @@
-const { logger } = require('../config/logger');
-const config = require('../config/environment');
-const fs = require('fs').promises;
-const path = require('path');
-const GitService = require('./gitService');
-const DockerService = require('./dockerService');
-const ProjectRepository = require('./projectRepository');
-const { getCacheService } = require('./cacheService');
+const { logger } = require("../config/logger");
+const config = require("../config/environment");
+const fs = require("fs").promises;
+const path = require("path");
+const BaseService = require("../utils/baseService");
+const {
+  ErrorFactory,
+  NotFoundError,
+  ValidationError,
+} = require("../utils/serviceErrors");
+const GitService = require("./gitService");
+const DockerService = require("./dockerService");
+const ProjectRepository = require("./projectRepository");
+const { getCacheService } = require("./cacheService");
 
 /**
  * In-memory project repository fallback when Redis is unavailable
@@ -38,7 +44,7 @@ class InMemoryProjectRepository {
     const updatedProject = {
       ...existingProject,
       ...updates,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
 
     this.projects.set(id, updatedProject);
@@ -62,11 +68,14 @@ class InMemoryProjectRepository {
 
   async searchProjects(criteria) {
     const allProjects = Array.from(this.projects.values());
-    
-    return allProjects.filter(project => {
+
+    return allProjects.filter((project) => {
       return Object.entries(criteria).every(([key, value]) => {
-        if (typeof value === 'string') {
-          return project[key] && project[key].toLowerCase().includes(value.toLowerCase());
+        if (typeof value === "string") {
+          return (
+            project[key] &&
+            project[key].toLowerCase().includes(value.toLowerCase())
+          );
         }
         return project[key] === value;
       });
@@ -76,21 +85,22 @@ class InMemoryProjectRepository {
 
 /**
  * Project Service - Main service for project management
- * Uses dependency injection for better testability and separation of concerns
+ * Enhanced with BaseService patterns and better error handling
  */
-class ProjectService {
+class ProjectService extends BaseService {
   constructor(dependencies = {}) {
+    super("ProjectService", dependencies);
+
     this.projectsDir = config.projectsDir;
     this.maxConcurrentDeployments = config.maxConcurrentDeployments;
     this.deploymentTimeout = config.deploymentTimeout;
-    
+
     // Dependency injection
     this.gitService = dependencies.gitService || new GitService();
     this.dockerService = dependencies.dockerService || new DockerService();
     this.projectRepository = dependencies.projectRepository || null;
     this.cacheService = dependencies.cacheService || getCacheService();
-    
-    this.logger = logger;
+
     this.ensureProjectsDirectory();
   }
 
@@ -101,11 +111,13 @@ class ProjectService {
   getProjectRepository() {
     if (!this.projectRepository) {
       try {
-        const { getRedisClient } = require('../config/redis');
+        const { getRedisClient } = require("../config/redis");
         const redisClient = getRedisClient();
         this.projectRepository = new ProjectRepository(redisClient);
       } catch (error) {
-        this.logger.warn('Redis not available, using in-memory project storage');
+        this.logger.warn(
+          "Redis not available, using in-memory project storage"
+        );
         this.projectRepository = new InMemoryProjectRepository();
       }
     }
@@ -116,7 +128,7 @@ class ProjectService {
     try {
       await fs.mkdir(this.projectsDir, { recursive: true });
     } catch (error) {
-      logger.error('Failed to create projects directory:', error);
+      logger.error("Failed to create projects directory:", error);
     }
   }
 
@@ -126,24 +138,24 @@ class ProjectService {
    */
   async getAllProjects() {
     try {
-      const cacheKey = 'projects:all';
-      
+      const cacheKey = "projects:all";
+
       // Try to get from cache first
       const cached = await this.cacheService.get(cacheKey);
       if (cached) {
-        this.logger.debug('Projects retrieved from cache');
+        this.logger.debug("Projects retrieved from cache");
         return cached;
       }
-      
+
       // Get from repository
       const projects = await this.getProjectRepository().getAllProjects();
-      
+
       // Cache the result
       await this.cacheService.set(cacheKey, projects, 60); // Cache for 1 minute
-      
+
       return projects;
     } catch (error) {
-      this.logger.error('Failed to get all projects:', error);
+      this.logger.error("Failed to get all projects:", error);
       return [];
     }
   }
@@ -157,7 +169,7 @@ class ProjectService {
     try {
       return await this.getProjectRepository().getProjectById(id);
     } catch (error) {
-      this.logger.error('Failed to get project by ID:', error);
+      this.logger.error("Failed to get project by ID:", error);
       return null;
     }
   }
@@ -172,17 +184,21 @@ class ProjectService {
     const project = {
       ...projectData,
       id,
-      status: 'deploying',
+      status: "deploying",
       createdAt: new Date(),
       updatedAt: new Date(),
-      lastDeployed: new Date()
+      lastDeployed: new Date(),
     };
 
     try {
       // Validate repository before starting deployment
-      const isValidRepo = await this.gitService.validateRepository(project.repository);
+      const isValidRepo = await this.gitService.validateRepository(
+        project.repository
+      );
       if (!isValidRepo) {
-        throw new Error(`Invalid or inaccessible repository: ${project.repository}`);
+        throw new Error(
+          `Invalid or inaccessible repository: ${project.repository}`
+        );
       }
 
       // Store project in repository
@@ -190,11 +206,18 @@ class ProjectService {
 
       // Clone repository
       const projectPath = path.join(this.projectsDir, project.name);
-      await this.gitService.cloneRepository(project.repository, project.branch, projectPath);
+      await this.gitService.cloneRepository(
+        project.repository,
+        project.branch,
+        projectPath
+      );
 
       // Build project if build command exists
       if (project.buildCommand) {
-        await this.dockerService.buildProject(projectPath, project.buildCommand);
+        await this.dockerService.buildProject(
+          projectPath,
+          project.buildCommand
+        );
       }
 
       // Create Docker Compose file for the project
@@ -204,20 +227,19 @@ class ProjectService {
       await this.dockerService.startProject(projectPath);
 
       // Update project status
-      project.status = 'running';
+      project.status = "running";
       project.updatedAt = new Date();
       await this.getProjectRepository().saveProject(id, project);
 
       // Invalidate cache
-      await this.cacheService.delete('projects:all');
+      await this.cacheService.delete("projects:all");
       await this.cacheService.delete(`project:${id}`);
 
       this.logger.info(`Project deployed successfully: ${project.name}`);
       return project;
-
     } catch (error) {
-      this.logger.error('Failed to deploy project:', error);
-      project.status = 'error';
+      this.logger.error("Failed to deploy project:", error);
+      project.status = "error";
       project.updatedAt = new Date();
       project.error = error.message;
       await this.getProjectRepository().saveProject(id, project);
@@ -235,7 +257,7 @@ class ProjectService {
     try {
       return await this.getProjectRepository().updateProject(id, updates);
     } catch (error) {
-      this.logger.error('Failed to update project:', error);
+      this.logger.error("Failed to update project:", error);
       return null;
     }
   }
@@ -263,7 +285,7 @@ class ProjectService {
       this.logger.info(`Project deleted: ${project.name}`);
       return true;
     } catch (error) {
-      this.logger.error('Failed to delete project:', error);
+      this.logger.error("Failed to delete project:", error);
       return false;
     }
   }
@@ -284,13 +306,13 @@ class ProjectService {
 
       // Update project status
       await this.getProjectRepository().updateProject(id, {
-        status: 'running',
-        lastDeployed: new Date()
+        status: "running",
+        lastDeployed: new Date(),
       });
 
       return true;
     } catch (error) {
-      this.logger.error('Failed to restart project:', error);
+      this.logger.error("Failed to restart project:", error);
       return false;
     }
   }
@@ -309,7 +331,7 @@ class ProjectService {
       const projectPath = path.join(this.projectsDir, project.name);
       return await this.dockerService.getProjectLogs(projectPath, lines);
     } catch (error) {
-      this.logger.error('Failed to get project logs:', error);
+      this.logger.error("Failed to get project logs:", error);
       return null;
     }
   }
@@ -325,16 +347,20 @@ class ProjectService {
       if (!project) return null;
 
       const projectPath = path.join(this.projectsDir, project.name);
-      const dockerStatus = await this.dockerService.getProjectStatus(projectPath);
+      const dockerStatus = await this.dockerService.getProjectStatus(
+        projectPath
+      );
 
       return {
         project,
         containers: dockerStatus.containers,
         status: project.status,
-        uptime: project.lastDeployed ? Date.now() - project.lastDeployed.getTime() : 0
+        uptime: project.lastDeployed
+          ? Date.now() - project.lastDeployed.getTime()
+          : 0,
       };
     } catch (error) {
-      this.logger.error('Failed to get project status:', error);
+      this.logger.error("Failed to get project status:", error);
       return null;
     }
   }
@@ -345,7 +371,7 @@ class ProjectService {
    * @returns {string} Generated project ID
    */
   generateProjectId(name) {
-    return name.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Date.now();
+    return name.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now();
   }
 
   /**
@@ -357,14 +383,14 @@ class ProjectService {
       const projects = await this.getAllProjects();
       const stats = {
         total: projects.length,
-        running: projects.filter(p => p.status === 'running').length,
-        stopped: projects.filter(p => p.status === 'stopped').length,
-        deploying: projects.filter(p => p.status === 'deploying').length,
-        error: projects.filter(p => p.status === 'error').length
+        running: projects.filter((p) => p.status === "running").length,
+        stopped: projects.filter((p) => p.status === "stopped").length,
+        deploying: projects.filter((p) => p.status === "deploying").length,
+        error: projects.filter((p) => p.status === "error").length,
       };
       return stats;
     } catch (error) {
-      this.logger.error('Failed to get project statistics:', error);
+      this.logger.error("Failed to get project statistics:", error);
       return { total: 0, running: 0, stopped: 0, deploying: 0, error: 0 };
     }
   }
@@ -378,7 +404,7 @@ class ProjectService {
     try {
       return await this.getProjectRepository().searchProjects(criteria);
     } catch (error) {
-      this.logger.error('Failed to search projects:', error);
+      this.logger.error("Failed to search projects:", error);
       return [];
     }
   }
@@ -398,14 +424,14 @@ class ProjectService {
 
       // Update project status
       await this.getProjectRepository().updateProject(id, {
-        status: 'running',
-        updatedAt: new Date()
+        status: "running",
+        updatedAt: new Date(),
       });
 
       this.logger.info(`Project started: ${project.name}`);
       return true;
     } catch (error) {
-      this.logger.error('Failed to start project:', error);
+      this.logger.error("Failed to start project:", error);
       return false;
     }
   }
@@ -425,19 +451,19 @@ class ProjectService {
 
       // Update project status
       await this.getProjectRepository().updateProject(id, {
-        status: 'stopped',
-        updatedAt: new Date()
+        status: "stopped",
+        updatedAt: new Date(),
       });
 
       this.logger.info(`Project stopped: ${project.name}`);
       return true;
     } catch (error) {
-      this.logger.error('Failed to stop project:', error);
+      this.logger.error("Failed to stop project:", error);
       return false;
     }
   }
 }
 
 module.exports = {
-  ProjectService
+  ProjectService,
 };

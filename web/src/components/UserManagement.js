@@ -36,7 +36,7 @@ const UserManagement = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/users');
+      const response = await apiClient.get('/users');
       setUsers(response.data.data || []);
     } catch (error) {
       toast.error('Failed to fetch users');
@@ -49,7 +49,7 @@ const UserManagement = () => {
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('/api/users', formData);
+      await apiClient.post('/users', formData);
       toast.success('User created successfully');
       setShowCreateForm(false);
       setFormData({ username: '', email: '', password: '', roles: ['user'] });

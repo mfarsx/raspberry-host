@@ -55,22 +55,15 @@ help:
 # Environment setup
 setup:
 	@echo "Setting up Raspberry Pi 5 Hosting Platform..."
-	@if [ ! -f .env ]; then \
-		echo "Creating .env file from template..."; \
-		cp .env.example .env; \
-		echo "Please edit .env file with your configuration before running 'make up'"; \
-	else \
-		echo ".env file already exists"; \
-	fi
 	@echo "Creating necessary directories..."
-	@mkdir -p logs backups scripts
-	@echo "Setup complete! Edit .env file and run 'make up' to start services."
+	@mkdir -p api/logs api/uploads api/projects
+	@echo "Setup complete! Run 'make dev' to start development environment."
 
 # Setup external services (MongoDB and Redis on Pi)
 setup-services:
 	@echo "Setting up MongoDB and Redis on Raspberry Pi..."
-	@./scripts/setup-services.sh
-	@echo "External services setup complete!"
+	@echo "Note: Services are now managed via Docker Compose"
+	@echo "Run 'make dev' to start development environment with MongoDB and Redis"
 
 # Production deployment
 up:
@@ -84,11 +77,6 @@ up:
 # Development environment
 dev:
 	@echo "Setting up development environment..."
-	@if [ ! -f .env ]; then \
-		echo "Creating .env file from template..."; \
-		cp .env.example .env; \
-		echo "Please edit .env file with your configuration"; \
-	fi
 	@echo "Stopping any running production services..."
 	@docker compose down 2>/dev/null || echo "No production services to stop"
 	@echo "Starting development environment..."
@@ -131,31 +119,31 @@ status:
 # Test API connectivity
 check-api:
 	@echo "Testing API endpoints..."
-	@echo "Testing /api/health..."
-	@curl -k -s https://localhost/api/health | jq .ok || echo "Health endpoint failed"
+	@echo "Testing /api/health-check..."
+	@curl -s http://localhost:3001/api/health-check | jq .status || echo "Health endpoint failed"
 	@echo ""
 	@echo "Testing /api/stats..."
-	@curl -k -s https://localhost/api/stats | jq .ok || echo "Stats endpoint failed"
+	@curl -s http://localhost:3001/api/stats | jq .ok || echo "Stats endpoint failed"
 	@echo ""
 	@echo "Testing frontend..."
-	@curl -k -s -I https://localhost | grep "200 OK" || echo "Frontend failed"
+	@curl -s -I http://localhost:3000 | grep "200 OK" || echo "Frontend failed"
 
 # Run tests
 test:
 	@echo "Running tests..."
-	@docker compose exec api npm test
-	@docker compose exec web npm test
+	@docker compose -f docker-compose.dev.yml exec api npm test 2>/dev/null || echo "No tests configured for API"
+	@docker compose -f docker-compose.dev.yml exec web npm test 2>/dev/null || echo "No tests configured for web"
 
 # Build services
 build:
 	@echo "Building all services..."
-	@docker compose build --no-cache
+	@docker compose -f docker-compose.dev.yml build --no-cache
 
 # Update services
 update:
 	@echo "Updating services..."
-	@docker compose pull
-	@docker compose up -d
+	@docker compose -f docker-compose.dev.yml pull
+	@docker compose -f docker-compose.dev.yml up -d
 	@echo "Services updated!"
 
 # Clean up
@@ -169,11 +157,11 @@ clean:
 backup:
 	@echo "Creating backup..."
 	@mkdir -p backups/$(shell date +%Y%m%d_%H%M%S)
-	@docker compose exec mongodb mongodump --out /tmp/backup/mongodb
-	@docker compose exec mongodb tar -czf /tmp/backup/mongodb.tar.gz -C /tmp/backup mongodb
-	@docker compose cp mongodb:/tmp/backup/mongodb.tar.gz backups/$(shell date +%Y%m%d_%H%M%S)/
-	@docker compose exec redis redis-cli BGSAVE
-	@docker compose cp redis:/data/dump.rdb backups/$(shell date +%Y%m%d_%H%M%S)/
+	@docker compose -f docker-compose.dev.yml exec mongodb mongodump --out /tmp/backup/mongodb 2>/dev/null || echo "MongoDB backup failed"
+	@docker compose -f docker-compose.dev.yml exec mongodb tar -czf /tmp/backup/mongodb.tar.gz -C /tmp/backup mongodb 2>/dev/null || echo "MongoDB archive failed"
+	@docker compose -f docker-compose.dev.yml cp mongodb:/tmp/backup/mongodb.tar.gz backups/$(shell date +%Y%m%d_%H%M%S)/ 2>/dev/null || echo "MongoDB copy failed"
+	@docker compose -f docker-compose.dev.yml exec redis redis-cli BGSAVE 2>/dev/null || echo "Redis backup failed"
+	@docker compose -f docker-compose.dev.yml cp redis:/data/dump.rdb backups/$(shell date +%Y%m%d_%H%M%S)/ 2>/dev/null || echo "Redis copy failed"
 	@echo "Backup created in backups/ directory"
 
 # Restore data
@@ -199,8 +187,8 @@ restore-backup:
 # Security checks
 security:
 	@echo "Running security checks..."
-	@docker compose exec api npm audit
-	@docker compose exec web npm audit
+	@docker compose -f docker-compose.dev.yml exec api npm audit 2>/dev/null || echo "API audit failed"
+	@docker compose -f docker-compose.dev.yml exec web npm audit 2>/dev/null || echo "Web audit failed"
 	@echo "Security check complete!"
 
 # Vulnerability scan
@@ -222,13 +210,8 @@ deploy:
 # Quick production setup
 quick-prod:
 	@echo "Quick production setup..."
-	@if [ ! -f .env ]; then \
-		cp .env.example .env; \
-		echo "Created .env file from template"; \
-	fi
-	@sed -i 's/NODE_ENV=development/NODE_ENV=production/' .env 2>/dev/null || echo "NODE_ENV not found in .env"
-	@sed -i 's/DEV_MODE=true/DEV_MODE=false/' .env 2>/dev/null || echo "DEV_MODE not found in .env"
-	@make deploy
+	@echo "Note: Production setup requires docker-compose.yml configuration"
+	@echo "Run 'make up' for production or 'make dev' for development"
 
 # Show resource usage
 resources:

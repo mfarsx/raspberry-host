@@ -251,20 +251,18 @@ class GitService {
     try {
       const sanitizedUrl = sanitizeGitUrl(repository);
       
-      return new Promise((resolve) => {
-        const child = spawn('git', ['ls-remote', sanitizedUrl], {
-          stdio: ['pipe', 'pipe', 'pipe'],
-          timeout: 30000 // 30 seconds timeout
-        });
-        
-        child.on('close', (code) => {
-          resolve(code === 0);
-        });
-        
-        child.on('error', () => {
-          resolve(false);
-        });
+      this.logger.info(`Validating repository: ${sanitizedUrl}`);
+      
+      // Use execAsync with timeout instead of spawn
+      const command = `git ls-remote "${sanitizedUrl}"`;
+      const { stdout, stderr } = await execAsync(command, { 
+        timeout: 10000,
+        maxBuffer: 1024 * 1024 // 1MB buffer
       });
+      
+      this.logger.info(`Repository validation successful: ${repository}`);
+      return true;
+      
     } catch (error) {
       this.logger.warn(`Repository validation failed: ${repository}`, error.message);
       return false;

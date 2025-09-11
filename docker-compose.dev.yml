@@ -23,7 +23,10 @@ services:
       - /app/node_modules
       - api_logs:/app/logs
       - api_uploads:/app/uploads
-      - /var/run/docker.sock:/var/run/docker.sock
+      - /Users/mfarsx/.docker/run/docker.sock:/var/run/docker.sock
+    user: "0:0"
+    group_add:
+      - "999"
     ports:
       - "3001:3001"
     depends_on:
@@ -36,15 +39,16 @@ services:
 
   # Development Web
   web:
-    image: node:18-alpine
+    image: node:20-alpine
     container_name: pi-web-dev
     restart: unless-stopped
     working_dir: /app
-    command: sh -c "npm install && npm start"
+    command: sh -c "npm install && NODE_OPTIONS='--no-deprecation' npm start"
     environment:
       - REACT_APP_API_URL=http://localhost:3001/api
       - REACT_APP_WS_URL=ws://localhost:3001
       - REACT_APP_ENV=development
+      - NODE_NO_WARNINGS=1
     volumes:
       - ./web:/app
     ports:

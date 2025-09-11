@@ -26,7 +26,7 @@ RUN npm config set fetch-retry-mintimeout 20000 && \
     npm install --no-audit --no-fund --ignore-scripts
 COPY . .
 RUN chown -R nodejs:nodejs /app
-USER nodejs
+# USER nodejs  # Commented out to allow docker-compose user override
 EXPOSE 3001
 CMD ["npm", "run", "dev"]
 

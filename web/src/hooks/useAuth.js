@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import apiClient from '../config/axios';
 import toast from 'react-hot-toast';
 
@@ -13,18 +14,15 @@ const loginUser = async (credentials) => {
 export const useLogin = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { login } = useAuth();
 
   return useMutation({
     mutationFn: loginUser,
     onSuccess: (data) => {
       const { token, user } = data;
       
-      // Store token in localStorage
-      localStorage.setItem('authToken', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      // Set default authorization header
-      apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      // Use the context login method
+      login(user, token);
       
       // Invalidate and refetch user-related queries
       queryClient.invalidateQueries({ queryKey: ['user'] });
@@ -42,15 +40,12 @@ export const useLogin = () => {
 export const useLogout = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { logout } = useAuth();
 
   return useMutation({
     mutationFn: async () => {
-      // Clear localStorage
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      
-      // Remove authorization header
-      delete apiClient.defaults.headers.common['Authorization'];
+      // Use the context logout method
+      logout();
       
       // Clear all queries
       queryClient.clear();

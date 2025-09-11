@@ -156,6 +156,27 @@ const performanceLogger = {
 
 // Security event logging
 const securityLogger = {
+  info: (message, data = {}) => {
+    logger.info(`Security: ${message}`, {
+      ...data,
+      timestamp: new Date().toISOString()
+    });
+  },
+  
+  warn: (message, data = {}) => {
+    logger.warn(`Security: ${message}`, {
+      ...data,
+      timestamp: new Date().toISOString()
+    });
+  },
+  
+  error: (message, data = {}) => {
+    logger.error(`Security: ${message}`, {
+      ...data,
+      timestamp: new Date().toISOString()
+    });
+  },
+  
   loginAttempt: (ip, user, success) => {
     logger.warn('Security: Login Attempt', {
       ip,

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import apiClient from '../config/axios';
 import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
 import { 
   Upload, 
   GitBranch, 
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 
 const DeployProject = () => {
+  const { user, isAuthenticated, hasRole } = useAuth();
   const [formData, setFormData] = useState({
     name: '',
     domain: '',
@@ -51,6 +52,19 @@ const DeployProject = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Check authentication
+    if (!isAuthenticated) {
+      toast.error('Please log in to deploy projects');
+      return;
+    }
+    
+    // Check admin role
+    if (!hasRole('admin')) {
+      toast.error('Admin privileges required to deploy projects');
+      return;
+    }
+    
     setLoading(true);
 
     try {
@@ -67,26 +81,48 @@ const DeployProject = () => {
         environment
       };
 
-      const response = await axios.post('/api/projects/deploy', payload);
+      console.log('Sending deployment request:', payload);
       
-      toast.success('Project deployed successfully!');
+      const response = await apiClient.post('/projects/deploy', payload);
       
-      // Reset form
-      setFormData({
-        name: '',
-        domain: '',
-        repository: '',
-        branch: 'main',
-        buildCommand: '',
-        startCommand: '',
-        port: 3000,
-        environment: {}
-      });
-      setEnvVars([]);
+      if (response.data.success) {
+        toast.success('Project deployed successfully!');
+        
+        // Reset form
+        setFormData({
+          name: '',
+          domain: '',
+          repository: '',
+          branch: 'main',
+          buildCommand: '',
+          startCommand: '',
+          port: 3000,
+          environment: {}
+        });
+        setEnvVars([]);
+      } else {
+        toast.error(response.data.error || 'Failed to deploy project');
+      }
       
     } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to deploy project');
       console.error('Deployment error:', error);
+      
+      if (error.response?.status === 401) {
+        toast.error('Authentication failed. Please log in again.');
+      } else if (error.response?.status === 403) {
+        toast.error('Access denied. Admin privileges required.');
+      } else if (error.response?.status === 400) {
+        const errorData = error.response.data;
+        if (errorData.details && Array.isArray(errorData.details)) {
+          // Show validation errors
+          const errorMessages = errorData.details.map(detail => detail.message).join(', ');
+          toast.error(`Validation failed: ${errorMessages}`);
+        } else {
+          toast.error(errorData.error || 'Invalid request data');
+        }
+      } else {
+        toast.error(error.response?.data?.error || 'Failed to deploy project');
+      }
     } finally {
       setLoading(false);
     }

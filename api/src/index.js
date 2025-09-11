@@ -28,10 +28,12 @@ const server = createServer(app);
 const io = new SocketIOServer(server, {
   cors: {
     origin: config.corsOrigin,
-    methods: ["GET", "POST"],
-    credentials: true
+    methods: ["GET", "POST", "OPTIONS"],
+    credentials: true,
+    allowedHeaders: ["Content-Type", "Authorization"]
   },
-  allowEIO3: true
+  allowEIO3: true,
+  transports: ["polling", "websocket"]
 });
 
 const PORT = config.port;
@@ -109,21 +111,89 @@ app.use('*', (req, res) => {
   });
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM received, shutting down gracefully');
-  server.close(() => {
-    logger.info('Process terminated');
-    process.exit(0);
+// Graceful shutdown handling
+let isShuttingDown = false;
+
+const gracefulShutdown = (signal) => {
+  if (isShuttingDown) {
+    logger.warn(`${signal} received again, forcing exit`);
+    process.exit(1);
+  }
+  
+  isShuttingDown = true;
+  logger.info(`${signal} received, shutting down gracefully`);
+  
+  // Stop accepting new connections
+  server.close((err) => {
+    if (err) {
+      logger.error('Error during server shutdown:', err);
+      process.exit(1);
+    }
+    
+    logger.info('HTTP server closed');
+    
+    // Close database connections if they exist
+    try {
+      if (config.isProduction) {
+        // Close MongoDB connection
+        const mongoose = require('mongoose');
+        if (mongoose.connection.readyState === 1) {
+          mongoose.connection.close(false, () => {
+            logger.info('MongoDB connection closed');
+          });
+        }
+        
+        // Close Redis connection
+        const { getRedisClient } = require('./config/redis');
+        const redisClient = getRedisClient();
+        if (redisClient && redisClient.isOpen) {
+          redisClient.quit(() => {
+            logger.info('Redis connection closed');
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('Error closing database connections:', error);
+    }
+    
+    // Give connections time to close, then force exit
+    setTimeout(() => {
+      logger.info('Process terminated gracefully');
+      process.exit(0);
+    }, 5000);
   });
+  
+  // Force exit after 10 seconds
+  setTimeout(() => {
+    logger.error('Forced shutdown after timeout');
+    process.exit(1);
+  }, 10000);
+};
+
+// Handle different shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', {
+    error: error.message,
+    stack: error.stack
+  });
+  
+  // Don't exit immediately, let graceful shutdown handle it
+  gracefulShutdown('UNCAUGHT_EXCEPTION');
 });
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT received, shutting down gracefully');
-  server.close(() => {
-    logger.info('Process terminated');
-    process.exit(0);
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection:', {
+    reason: reason?.message || reason,
+    promise: promise.toString()
   });
+  
+  // Don't exit immediately, let graceful shutdown handle it
+  gracefulShutdown('UNHANDLED_REJECTION');
 });
 
 // Start server

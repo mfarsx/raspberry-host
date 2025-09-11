@@ -46,11 +46,11 @@ const DockerManagement = () => {
           setNetworks(networksRes.data.data || []);
           break;
         case 'volumes':
-          const volumesRes = await axios.get('/api/docker/volumes');
+          const volumesRes = await apiClient.get('/docker/volumes');
           setVolumes(volumesRes.data.data || []);
           break;
         case 'info':
-          const infoRes = await axios.get('/api/docker/info');
+          const infoRes = await apiClient.get('/docker/info');
           setSystemInfo(infoRes.data.data);
           break;
       }

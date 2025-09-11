@@ -3,6 +3,8 @@ const { promisify } = require('util');
 const { logger } = require('../config/logger');
 const fs = require('fs').promises;
 const path = require('path');
+const BaseService = require('../utils/baseService');
+const { ErrorFactory, CommandExecutionError, ValidationError } = require('../utils/serviceErrors');
 
 const execAsync = promisify(exec);
 
@@ -42,10 +44,11 @@ function validateFilePath(filePath, basePath) {
 
 /**
  * Docker Service - Handles all Docker-related operations
+ * Enhanced with BaseService patterns for better error handling and metrics
  */
-class DockerService {
-  constructor() {
-    this.logger = logger;
+class DockerService extends BaseService {
+  constructor(dependencies = {}) {
+    super('DockerService', dependencies);
   }
 
   /**
@@ -60,6 +63,8 @@ class DockerService {
       const sanitizedPath = validateFilePath(projectPath, process.cwd());
       const sanitizedCommand = sanitizeCommandInput(buildCommand);
       
+      this.logger.info(`Starting build for project: ${sanitizedPath}`);
+      
       // Use spawn instead of exec for better security
       const { spawn } = require('child_process');
       
@@ -71,34 +76,80 @@ class DockerService {
         
         let stdout = '';
         let stderr = '';
+        let isResolved = false;
         
         child.stdout.on('data', (data) => {
           stdout += data.toString();
+          // Log build progress in debug mode
+          this.logger.debug(`Build output: ${data.toString().trim()}`);
         });
         
         child.stderr.on('data', (data) => {
           stderr += data.toString();
+          // Log build warnings/errors
+          this.logger.warn(`Build warning: ${data.toString().trim()}`);
         });
         
         child.on('close', (code) => {
+          if (isResolved) return;
+          isResolved = true;
+          
           if (code === 0) {
             this.logger.info(`Project built successfully: ${sanitizedPath}`);
             resolve();
           } else {
-            const error = new Error(`Build failed with exit code ${code}: ${stderr}`);
-            this.logger.error('Failed to build project:', error);
+            const error = new Error(`Build failed with exit code ${code}`);
+            error.exitCode = code;
+            error.stdout = stdout;
+            error.stderr = stderr;
+            error.projectPath = sanitizedPath;
+            error.buildCommand = sanitizedCommand;
+            
+            this.logger.error('Build failed:', {
+              projectPath: sanitizedPath,
+              exitCode: code,
+              stderr: stderr.trim(),
+              stdout: stdout.trim()
+            });
+            
             reject(error);
           }
         });
         
         child.on('error', (error) => {
-          this.logger.error('Failed to build project:', error);
-          reject(new Error(`Build failed: ${error.message}`));
+          if (isResolved) return;
+          isResolved = true;
+          
+          this.logger.error('Build process error:', {
+            projectPath: sanitizedPath,
+            error: error.message,
+            code: error.code
+          });
+          
+          reject(new Error(`Build process failed: ${error.message}`));
+        });
+        
+        // Handle timeout
+        child.on('timeout', () => {
+          if (isResolved) return;
+          isResolved = true;
+          
+          child.kill('SIGTERM');
+          this.logger.error('Build timeout:', {
+            projectPath: sanitizedPath,
+            timeout: '5 minutes'
+          });
+          
+          reject(new Error('Build timeout after 5 minutes'));
         });
       });
     } catch (error) {
-      this.logger.error('Failed to build project:', error);
-      throw new Error(`Build failed: ${error.message}`);
+      this.logger.error('Build setup failed:', {
+        projectPath,
+        error: error.message,
+        stack: error.stack
+      });
+      throw new Error(`Build setup failed: ${error.message}`);
     }
   }
 
@@ -109,15 +160,28 @@ class DockerService {
    * @returns {Promise<void>}
    */
   async createProjectCompose(project, projectPath) {
-    try {
-      const composePath = path.join(projectPath, 'compose.yaml');
-      const composeContent = this.generateComposeContent(project);
-      await fs.writeFile(composePath, composeContent);
-      this.logger.info(`Docker Compose file created: ${composePath}`);
-    } catch (error) {
-      this.logger.error('Failed to create Docker Compose file:', error);
-      throw new Error(`Failed to create Docker Compose file: ${error.message}`);
-    }
+    return this.executeOperation('createProjectCompose', async () => {
+      // Validate inputs
+      this.validateRequiredParams({ project, projectPath }, ['project', 'projectPath']);
+      this.validateParamTypes({ project, projectPath }, { project: 'object', projectPath: 'string' });
+      
+      try {
+        const sanitizedPath = validateFilePath(projectPath, process.cwd());
+        const composePath = path.join(sanitizedPath, 'compose.yaml');
+        const composeContent = this.generateComposeContent(project);
+        
+        await fs.writeFile(composePath, composeContent);
+        return { composePath, success: true };
+      } catch (error) {
+        if (error.code === 'ENOENT') {
+          throw ErrorFactory.notFound('Project directory', projectPath);
+        }
+        if (error.code === 'EACCES') {
+          throw ErrorFactory.validation('Permission denied writing compose file', 'projectPath', projectPath);
+        }
+        throw ErrorFactory.fromError(error, { operation: 'createProjectCompose', projectPath });
+      }
+    }, { projectId: project.id, projectPath });
   }
 
   /**
@@ -130,8 +194,26 @@ class DockerService {
       const sanitizedPath = validateFilePath(projectPath, process.cwd());
       const composeFile = path.join(sanitizedPath, 'compose.yaml');
       
+      this.logger.info(`Starting Docker project: ${sanitizedPath}`);
+      
       // Verify compose file exists
-      await fs.access(composeFile);
+      try {
+        await fs.access(composeFile);
+      } catch (error) {
+        this.logger.error('Compose file not found:', {
+          projectPath: sanitizedPath,
+          composeFile,
+          error: error.message
+        });
+        throw new Error(`Docker Compose file not found: ${composeFile}`);
+      }
+      
+      // Check if Docker is available
+      const dockerAvailable = await this.isDockerAvailable();
+      if (!dockerAvailable) {
+        this.logger.error('Docker not available');
+        throw new Error('Docker is not available or not running');
+      }
       
       const { spawn } = require('child_process');
       
@@ -144,34 +226,77 @@ class DockerService {
         
         let stdout = '';
         let stderr = '';
+        let isResolved = false;
         
         child.stdout.on('data', (data) => {
           stdout += data.toString();
+          this.logger.debug(`Docker start output: ${data.toString().trim()}`);
         });
         
         child.stderr.on('data', (data) => {
           stderr += data.toString();
+          this.logger.warn(`Docker start warning: ${data.toString().trim()}`);
         });
         
         child.on('close', (code) => {
+          if (isResolved) return;
+          isResolved = true;
+          
           if (code === 0) {
-            this.logger.info(`Project started: ${sanitizedPath}`);
+            this.logger.info(`Project started successfully: ${sanitizedPath}`);
             resolve();
           } else {
-            const error = new Error(`Failed to start project with exit code ${code}: ${stderr}`);
-            this.logger.error('Failed to start project:', error);
+            const error = new Error(`Failed to start project with exit code ${code}`);
+            error.exitCode = code;
+            error.stdout = stdout;
+            error.stderr = stderr;
+            error.projectPath = sanitizedPath;
+            
+            this.logger.error('Failed to start project:', {
+              projectPath: sanitizedPath,
+              exitCode: code,
+              stderr: stderr.trim(),
+              stdout: stdout.trim()
+            });
+            
             reject(error);
           }
         });
         
         child.on('error', (error) => {
-          this.logger.error('Failed to start project:', error);
-          reject(new Error(`Failed to start project: ${error.message}`));
+          if (isResolved) return;
+          isResolved = true;
+          
+          this.logger.error('Docker start process error:', {
+            projectPath: sanitizedPath,
+            error: error.message,
+            code: error.code
+          });
+          
+          reject(new Error(`Docker start process failed: ${error.message}`));
+        });
+        
+        // Handle timeout
+        child.on('timeout', () => {
+          if (isResolved) return;
+          isResolved = true;
+          
+          child.kill('SIGTERM');
+          this.logger.error('Docker start timeout:', {
+            projectPath: sanitizedPath,
+            timeout: '5 minutes'
+          });
+          
+          reject(new Error('Docker start timeout after 5 minutes'));
         });
       });
     } catch (error) {
-      this.logger.error('Failed to start project:', error);
-      throw new Error(`Failed to start project: ${error.message}`);
+      this.logger.error('Start project setup failed:', {
+        projectPath,
+        error: error.message,
+        stack: error.stack
+      });
+      throw new Error(`Start project setup failed: ${error.message}`);
     }
   }
 
@@ -181,7 +306,11 @@ class DockerService {
    * @returns {Promise<void>}
    */
   async stopProject(projectPath) {
-    try {
+    return this.executeOperation('stopProject', async () => {
+      // Validate inputs
+      this.validateRequiredParams({ projectPath }, ['projectPath']);
+      this.validateParamTypes({ projectPath }, { projectPath: 'string' });
+      
       const sanitizedPath = validateFilePath(projectPath, process.cwd());
       
       const { spawn } = require('child_process');
@@ -220,10 +349,7 @@ class DockerService {
           reject(new Error(`Failed to stop project: ${error.message}`));
         });
       });
-    } catch (error) {
-      this.logger.error('Failed to stop project:', error);
-      throw new Error(`Failed to stop project: ${error.message}`);
-    }
+    });
   }
 
   /**

@@ -231,40 +231,48 @@ class MonitoringService {
       const { spawn } = require('child_process');
       
       return new Promise((resolve) => {
-        const ps = spawn('ps', ['aux'], { stdio: ['pipe', 'pipe', 'pipe'] });
-        const head = spawn('head', ['-10'], { stdio: ['pipe', 'pipe', 'pipe'] });
-        
-        ps.stdout.pipe(head.stdin);
+        const child = spawn('ps', ['aux'], { 
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 10000 // 10 seconds timeout
+        });
         
         let stdout = '';
-        head.stdout.on('data', (data) => {
+        let stderr = '';
+        
+        child.stdout.on('data', (data) => {
           stdout += data.toString();
         });
         
-        head.on('close', (code) => {
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        child.on('close', (code) => {
           if (code === 0) {
             const lines = stdout.trim().split('\n');
-            const processes = lines.slice(1).map(line => {
+            const processes = lines.slice(1).slice(0, 10).map(line => {
               const parts = line.trim().split(/\s+/);
               return {
                 pid: parts[1],
-                cpu: parseFloat(parts[2]),
-                memory: parseFloat(parts[3]),
+                cpu: parseFloat(parts[2]) || 0,
+                memory: parseFloat(parts[3]) || 0,
                 command: parts.slice(10).join(' ')
               };
             });
 
             resolve({
-              total: process.pid, // This would need actual process count
+              total: processes.length,
               topCpu: processes.slice(0, 5),
               topMemory: processes.slice(0, 5) // Simplified - would need separate query
             });
           } else {
+            this.logger.warn('ps command failed:', stderr);
             resolve(null);
           }
         });
         
-        head.on('error', () => {
+        child.on('error', (error) => {
+          this.logger.error('Failed to get process metrics:', error);
           resolve(null);
         });
       });

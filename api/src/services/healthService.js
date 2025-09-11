@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { getRedisClient } = require('../config/redis');
 const { logger } = require('../config/logger');
+const DockerService = require('./dockerService');
 
 const checkDatabaseHealth = async () => {
   try {
@@ -108,7 +109,120 @@ const checkRedisHealth = async () => {
   }
 };
 
+const checkDockerHealth = async () => {
+  try {
+    // In development mode, skip Docker checks
+    if (process.env.NODE_ENV === 'development') {
+      return {
+        connected: true,
+        status: 'development_mode',
+        message: 'Docker connections skipped in development mode'
+      };
+    }
+    
+    const dockerService = new DockerService();
+    
+    // Check if Docker is available
+    const dockerAvailable = await dockerService.isDockerAvailable();
+    if (!dockerAvailable) {
+      return {
+        connected: false,
+        status: 'unavailable',
+        error: 'Docker is not available or not running'
+      };
+    }
+    
+    // Check Docker Compose availability
+    const dockerComposeAvailable = await dockerService.isDockerComposeAvailable();
+    if (!dockerComposeAvailable) {
+      return {
+        connected: false,
+        status: 'unavailable',
+        error: 'Docker Compose is not available'
+      };
+    }
+    
+    // Get Docker system info
+    const systemInfo = await dockerService.getSystemInfo();
+    
+    return {
+      connected: true,
+      status: 'available',
+      version: systemInfo.ServerVersion || 'Unknown',
+      containers: systemInfo.ContainersRunning || 0,
+      images: systemInfo.Images || 0
+    };
+    
+  } catch (error) {
+    logger.error('Docker health check failed:', error);
+    return {
+      connected: false,
+      status: 'error',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+};
+
+const checkSystemResources = async () => {
+  try {
+    const os = require('os');
+    
+    // Get memory usage
+    const totalMemory = os.totalmem();
+    const freeMemory = os.freemem();
+    const usedMemory = totalMemory - freeMemory;
+    const memoryUsagePercent = (usedMemory / totalMemory) * 100;
+    
+    // Get CPU load
+    const loadAverage = os.loadavg();
+    const cpuCount = os.cpus().length;
+    
+    // Get disk usage (if available)
+    let diskUsage = null;
+    try {
+      const { execSync } = require('child_process');
+      const dfOutput = execSync('df -h /', { encoding: 'utf8' });
+      const lines = dfOutput.split('\n');
+      if (lines.length > 1) {
+        const parts = lines[1].split(/\s+/);
+        diskUsage = {
+          total: parts[1],
+          used: parts[2],
+          available: parts[3],
+          usagePercent: parts[4]
+        };
+      }
+    } catch (diskError) {
+      logger.debug('Could not get disk usage:', diskError.message);
+    }
+    
+    return {
+      memory: {
+        total: `${Math.round(totalMemory / 1024 / 1024 / 1024)}GB`,
+        used: `${Math.round(usedMemory / 1024 / 1024 / 1024)}GB`,
+        free: `${Math.round(freeMemory / 1024 / 1024 / 1024)}GB`,
+        usagePercent: Math.round(memoryUsagePercent)
+      },
+      cpu: {
+        cores: cpuCount,
+        loadAverage: loadAverage.map(load => Math.round(load * 100) / 100),
+        loadPercent: Math.round((loadAverage[0] / cpuCount) * 100)
+      },
+      disk: diskUsage,
+      uptime: Math.round(os.uptime())
+    };
+    
+  } catch (error) {
+    logger.error('System resources check failed:', error);
+    return {
+      error: error instanceof Error ? error.message : 'Unknown error'
+    };
+  }
+};
+
 module.exports = {
   checkDatabaseHealth,
-  checkRedisHealth
+  checkRedisHealth,
+  checkDockerHealth,
+  checkSystemResources
 };

@@ -1,164 +1,148 @@
-'use client';
-
-import React, { useState, useCallback } from 'react';
-import { User, Lock, LogIn, Eye, EyeOff } from 'lucide-react';
-import { useLogin } from '../hooks/useAuth';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import apiClient from '../config/axios';
+import toast from 'react-hot-toast';
+import { useAuth } from '../contexts/AuthContext';
+import { 
+  LogIn, 
+  Mail, 
+  Lock,
+  Eye,
+  EyeOff
+} from 'lucide-react';
 
 const Login = () => {
-  const loginMutation = useLogin();
+  const navigate = useNavigate();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleInputChange = useCallback((e) => {
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-  }, []);
+  };
 
-  const handleSubmit = useCallback((e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    loginMutation.mutate(formData);
-  }, [formData, loginMutation]);
+    setLoading(true);
+
+    try {
+      const response = await apiClient.post('/auth/login', formData);
+      
+      if (response.data.success) {
+        // Store token and user data
+        localStorage.setItem('authToken', response.data.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.data.user));
+        
+        // Update auth context
+        login(response.data.data.user);
+        
+        toast.success('Login successful!');
+        
+        // Navigate to dashboard
+        navigate('/');
+        
+        // Reset form
+        setFormData({
+          email: '',
+          password: ''
+        });
+      } else {
+        toast.error(response.data.error || 'Login failed');
+      }
+      
+    } catch (error) {
+      const errorMessage = error.response?.data?.error || 'Login failed';
+      toast.error(errorMessage);
+      console.error('Login error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="container" style={{ maxWidth: '400px', margin: '50px auto' }}>
-      <div className="card">
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h1 style={{ margin: '0 0 10px 0', color: '#333' }}>
-            🍓 Pi Hosting Platform
-          </h1>
-          <p style={{ color: '#666', margin: 0 }}>Sign in to your account</p>
+    <div className="card">
+      <h2>Login to Deploy Projects</h2>
+      <p className="text-gray-600 mb-6">
+        Sign in to access the deployment platform
+      </p>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="form-group">
+          <label className="form-label">
+            <Mail size={16} className="inline mr-2" />
+            Email Address
+          </label>
+          <input
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            className="form-input"
+            placeholder="admin@example.com"
+            required
+          />
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-              Email Address
-            </label>
-            <div style={{ position: 'relative' }}>
-              <User size={20} style={{ 
-                position: 'absolute', 
-                left: '12px', 
-                top: '50%', 
-                transform: 'translateY(-50%)', 
-                color: '#666' 
-              }} />
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="admin@example.com"
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px 12px 12px 45px',
-                  border: '2px solid #e1e5e9',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  boxSizing: 'border-box'
-                }}
-              />
-            </div>
+        <div className="form-group">
+          <label className="form-label">
+            <Lock size={16} className="inline mr-2" />
+            Password
+          </label>
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              value={formData.password}
+              onChange={handleInputChange}
+              className="form-input pr-10"
+              placeholder="Enter your password"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
           </div>
+        </div>
 
-          <div style={{ marginBottom: '30px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500' }}>
-              Password
-            </label>
-            <div style={{ position: 'relative' }}>
-              <Lock size={20} style={{ 
-                position: 'absolute', 
-                left: '12px', 
-                top: '50%', 
-                transform: 'translateY(-50%)', 
-                color: '#666' 
-              }} />
-              <input
-                type={showPassword ? 'text' : 'password'}
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                placeholder="Enter your password"
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px 45px 12px 45px',
-                  border: '2px solid #e1e5e9',
-                  borderRadius: '8px',
-                  fontSize: '16px',
-                  boxSizing: 'border-box'
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={{
-                  position: 'absolute',
-                  right: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: '#666'
-                }}
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
-          </div>
-
+        <div className="flex justify-end">
           <button
             type="submit"
-            disabled={loginMutation.isPending}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: loginMutation.isPending ? '#ccc' : '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '16px',
-              fontWeight: '500',
-              cursor: loginMutation.isPending ? 'not-allowed' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px'
-            }}
+            disabled={loading}
+            className="btn btn-primary"
           >
-            {loginMutation.isPending ? (
+            {loading ? (
               <>
-                <div className="spinner" style={{ width: '16px', height: '16px' }}></div>
-                Signing in...
+                <div className="spinner mr-2" style={{ width: '16px', height: '16px' }}></div>
+                Signing In...
               </>
             ) : (
               <>
-                <LogIn size={20} />
+                <LogIn size={16} className="mr-2" />
                 Sign In
               </>
             )}
           </button>
-        </form>
-
-        <div style={{ 
-          marginTop: '20px', 
-          padding: '15px', 
-          background: '#f8f9fa', 
-          borderRadius: '8px',
-          fontSize: '14px',
-          color: '#666'
-        }}>
-          <strong>Demo Credentials:</strong><br />
-          Email: admin@example.com<br />
-          Password: password
         </div>
+      </form>
+
+      <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+        <h4 className="font-semibold mb-2 text-blue-800">Demo Credentials</h4>
+        <p className="text-sm text-blue-700">
+          <strong>Email:</strong> admin@example.com<br />
+          <strong>Password:</strong> password
+        </p>
       </div>
     </div>
   );

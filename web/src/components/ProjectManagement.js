@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import apiClient from '../config/axios';
+import { useWebSocket } from '../hooks/useWebSocket';
 import { 
-  Play, 
-  Square, 
   RotateCcw, 
   Trash2, 
   Eye, 
   Settings,
   Globe,
   Clock,
-  HardDrive
+  HardDrive,
+  Square,
+  Play,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 const ProjectManagement = () => {
@@ -20,10 +22,57 @@ const ProjectManagement = () => {
   const [selectedProject, setSelectedProject] = useState(null);
   const [showLogs, setShowLogs] = useState(false);
   const [logs, setLogs] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [liveLogs, setLiveLogs] = useState(false);
+  const { isConnected, socket } = useWebSocket();
 
   useEffect(() => {
     fetchProjects();
   }, []);
+
+  // WebSocket event listeners for real-time updates
+  useEffect(() => {
+    if (socket && isConnected) {
+      // Listen for project status updates
+      socket.on('project_status_update', (data) => {
+        console.log('Project status update received:', data);
+        setProjects(prevProjects => 
+          prevProjects.map(project => 
+            project.id === data.projectId 
+              ? { ...project, status: data.status }
+              : project
+          )
+        );
+        toast.success(`Project ${data.projectId} status updated to ${data.status}`);
+      });
+
+      // Listen for project logs
+      socket.on('project_logs', (data) => {
+        if (liveLogs && selectedProject && data.projectId === selectedProject) {
+          setLogs(prevLogs => [...prevLogs, data.message]);
+        }
+      });
+
+      // Listen for deployment progress
+      socket.on('deployment_progress', (data) => {
+        console.log('Deployment progress:', data);
+        setProjects(prevProjects => 
+          prevProjects.map(project => 
+            project.id === data.projectId 
+              ? { ...project, status: 'deploying', progress: data.progress }
+              : project
+          )
+        );
+      });
+
+      return () => {
+        socket.off('project_status_update');
+        socket.off('project_logs');
+        socket.off('deployment_progress');
+      };
+    }
+  }, [socket, isConnected, liveLogs, selectedProject]);
 
   const fetchProjects = async () => {
     try {
@@ -39,20 +88,32 @@ const ProjectManagement = () => {
 
   const handleStartProject = async (projectId) => {
     try {
-      await axios.post(`/api/projects/${projectId}/restart`);
-      toast.success('Project restarted successfully');
+      await apiClient.post(`/projects/${projectId}/start`);
+      toast.success('Project started successfully');
       fetchProjects();
     } catch (error) {
-      toast.error('Failed to restart project');
+      toast.error('Failed to start project');
     }
   };
 
   const handleStopProject = async (projectId) => {
     try {
-      // This would need a stop endpoint in the API
-      toast.info('Stop functionality not implemented yet');
+      await apiClient.post(`/projects/${projectId}/stop`);
+      toast.success('Project stopped successfully');
+      fetchProjects();
     } catch (error) {
       toast.error('Failed to stop project');
+      console.error('Stop project error:', error);
+    }
+  };
+
+  const handleRestartProject = async (projectId) => {
+    try {
+      await apiClient.post(`/projects/${projectId}/restart`);
+      toast.success('Project restarted successfully');
+      fetchProjects();
+    } catch (error) {
+      toast.error('Failed to restart project');
     }
   };
 
@@ -74,9 +135,30 @@ const ProjectManagement = () => {
       setLogs(response.data.data || []);
       setSelectedProject(projectId);
       setShowLogs(true);
+      
+      // Subscribe to live logs if WebSocket is connected
+      if (socket && isConnected) {
+        socket.emit('subscribe_logs', { projectId });
+      }
     } catch (error) {
       toast.error('Failed to fetch logs');
     }
+  };
+
+  const toggleLiveLogs = () => {
+    if (socket && isConnected && selectedProject) {
+      if (liveLogs) {
+        socket.emit('unsubscribe_logs', { projectId: selectedProject });
+        setLiveLogs(false);
+      } else {
+        socket.emit('subscribe_logs', { projectId: selectedProject });
+        setLiveLogs(true);
+      }
+    }
+  };
+
+  const clearLogs = () => {
+    setLogs([]);
   };
 
   const getStatusColor = (status) => {
@@ -107,6 +189,14 @@ const ProjectManagement = () => {
     return `${minutes}m`;
   };
 
+  // Filter projects based on search term and status
+  const filteredProjects = projects.filter(project => {
+    const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         project.domain.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   if (loading) {
     return (
       <div className="card">
@@ -122,13 +212,56 @@ const ProjectManagement = () => {
     <div>
       <div className="card">
         <div className="flex justify-between items-center mb-4">
-          <h2>Hosted Projects</h2>
+          <div className="flex items-center gap-4">
+            <h2>Hosted Projects</h2>
+            <div className="flex items-center gap-2">
+              {isConnected ? (
+                <span className="flex items-center gap-1 text-green-600 text-sm">
+                  <Wifi size={16} />
+                  Real-time Updates
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-red-600 text-sm">
+                  <WifiOff size={16} />
+                  Offline Mode
+                </span>
+              )}
+            </div>
+          </div>
           <button 
             className="btn btn-success"
             onClick={fetchProjects}
           >
             Refresh
           </button>
+        </div>
+
+        {/* Search and Filter Controls */}
+        <div className="grid grid-2 gap-4 mb-6">
+          <div className="form-group">
+            <label className="form-label">Search Projects</label>
+            <input
+              type="text"
+              placeholder="Search by name or domain..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="form-input"
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Filter by Status</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="form-input"
+            >
+              <option value="all">All Statuses</option>
+              <option value="running">Running</option>
+              <option value="stopped">Stopped</option>
+              <option value="deploying">Deploying</option>
+              <option value="error">Error</option>
+            </select>
+          </div>
         </div>
 
         {projects.length === 0 ? (
@@ -142,9 +275,26 @@ const ProjectManagement = () => {
               Deploy Project
             </a>
           </div>
+        ) : filteredProjects.length === 0 ? (
+          <div className="text-center p-8">
+            <HardDrive size={48} className="mx-auto mb-4 text-gray-400" />
+            <h3>No projects match your search criteria</h3>
+            <p className="text-gray-600 mb-4">
+              Try adjusting your search term or status filter
+            </p>
+            <button 
+              className="btn btn-secondary"
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('all');
+              }}
+            >
+              Clear Filters
+            </button>
+          </div>
         ) : (
           <div className="grid grid-2">
-            {projects.map((project) => (
+            {filteredProjects.map((project) => (
               <div key={project.id} className="card">
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -162,17 +312,34 @@ const ProjectManagement = () => {
                     >
                       <Eye size={16} />
                     </button>
+                    {project.status === 'running' ? (
+                      <button
+                        className="btn btn-warning"
+                        onClick={() => handleStopProject(project.id)}
+                        title="Stop Project"
+                      >
+                        <Square size={16} />
+                      </button>
+                    ) : (
+                      <button
+                        className="btn btn-success"
+                        onClick={() => handleStartProject(project.id)}
+                        title="Start Project"
+                      >
+                        <Play size={16} />
+                      </button>
+                    )}
                     <button
-                      className="btn btn-success"
-                      onClick={() => handleStartProject(project.id)}
-                      title="Restart"
+                      className="btn btn-info"
+                      onClick={() => handleRestartProject(project.id)}
+                      title="Restart Project"
                     >
                       <RotateCcw size={16} />
                     </button>
                     <button
                       className="btn btn-danger"
                       onClick={() => handleDeleteProject(project.id)}
-                      title="Delete"
+                      title="Delete Project"
                     >
                       <Trash2 size={16} />
                     </button>
@@ -214,17 +381,56 @@ const ProjectManagement = () => {
       {/* Logs Modal */}
       {showLogs && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-96 overflow-hidden">
+          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[80vh] overflow-hidden">
             <div className="p-4 border-b flex justify-between items-center">
-              <h3>Project Logs - {selectedProject}</h3>
-              <button
-                className="btn btn-secondary"
-                onClick={() => setShowLogs(false)}
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-4">
+                <h3>Project Logs - {selectedProject}</h3>
+                <div className="flex items-center gap-2">
+                  {isConnected ? (
+                    <span className="flex items-center gap-1 text-green-600">
+                      <Wifi size={16} />
+                      Connected
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-red-600">
+                      <WifiOff size={16} />
+                      Disconnected
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {isConnected && (
+                  <button
+                    className={`btn ${liveLogs ? 'btn-success' : 'btn-secondary'}`}
+                    onClick={toggleLiveLogs}
+                    title={liveLogs ? 'Stop Live Logs' : 'Start Live Logs'}
+                  >
+                    {liveLogs ? 'Live' : 'Static'}
+                  </button>
+                )}
+                <button
+                  className="btn btn-secondary"
+                  onClick={clearLogs}
+                  title="Clear Logs"
+                >
+                  Clear
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setShowLogs(false);
+                    setLiveLogs(false);
+                    if (socket && isConnected && selectedProject) {
+                      socket.emit('unsubscribe_logs', { projectId: selectedProject });
+                    }
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             </div>
-            <div className="p-4 overflow-y-auto max-h-80 bg-gray-900 text-green-400 font-mono text-sm">
+            <div className="p-4 overflow-y-auto max-h-[60vh] bg-gray-900 text-green-400 font-mono text-sm">
               {logs.length === 0 ? (
                 <p>No logs available</p>
               ) : (
@@ -233,6 +439,11 @@ const ProjectManagement = () => {
                     {log}
                   </div>
                 ))
+              )}
+              {liveLogs && (
+                <div className="text-yellow-400 animate-pulse">
+                  ● Live logs streaming...
+                </div>
               )}
             </div>
           </div>
