@@ -25,7 +25,7 @@ const DatabaseMonitoring = () => {
       setLoading(true);
       const response = await apiClient.get('/health');
       
-      if (response.data.success) {
+      if (response.data.ok) {
         setDbData(response.data.services.database);
         setRedisData(response.data.services.redis);
         setLastUpdated(new Date());
