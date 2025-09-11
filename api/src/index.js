@@ -205,13 +205,9 @@ async function startServer() {
     const monitoringService = new MonitoringService();
     monitoringService.startMonitoring();
     
-    // Connect to databases (optional in development)
-    if (config.isProduction) {
-      await connectDatabase();
-      await connectRedis();
-    } else {
-      logger.info('Running in development mode - skipping database connections');
-    }
+    // Connect to databases
+    await connectDatabase();
+    await connectRedis();
     
     server.listen(PORT, () => {
       timer.end();
