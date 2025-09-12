@@ -239,8 +239,8 @@ const DashboardRefactored = React.memo(() => {
           </div>
         ) : (
           <div className="grid grid-2">
-            {projects.slice(0, 4).map((project) => (
-              <div key={project.id} className="border rounded-lg p-4">
+            {projects.slice(0, 4).map((project, index) => (
+              <div key={project.id || `project-${index}`} className="border rounded-lg p-4">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="font-semibold">{project.name}</h3>
                   <span
