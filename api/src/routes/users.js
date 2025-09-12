@@ -26,18 +26,17 @@ router.get(
 // Create user (admin only)
 router.post(
   "/",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireRole("admin"),
-  ValidationMiddleware.sanitizeInput,
-  ValidationMiddleware.validateBody(userSchemas.createUser),
-  ResponseHelper.asyncHandler(userController.createUser.bind(userController))
+  ...MiddlewareComposer.createResource(
+    userController.createUser.bind(userController),
+    userSchemas.createUser,
+    "admin"
+  )
 );
 
 // Update user
 router.put(
   "/:id",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireOwnership("id"),
+  ...MiddlewareComposer.ownership("id"),
   ValidationMiddleware.validateParams(userSchemas.userId),
   ValidationMiddleware.sanitizeInput,
   ValidationMiddleware.validateBody(userSchemas.updateUser),
@@ -47,28 +46,28 @@ router.put(
 // Delete user (soft delete)
 router.delete(
   "/:id",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireRole("admin"),
-  ValidationMiddleware.validateParams(userSchemas.userId),
-  ResponseHelper.asyncHandler(userController.deleteUser.bind(userController))
+  ...MiddlewareComposer.deleteResource(
+    userController.deleteUser.bind(userController),
+    userSchemas.userId,
+    "admin"
+  )
 );
 
 // Assign roles to user (admin only)
 router.post(
   "/:id/roles",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireRole("admin"),
-  ValidationMiddleware.validateParams(userSchemas.userId),
-  ValidationMiddleware.sanitizeInput,
-  ValidationMiddleware.validateBody(userSchemas.assignRoles),
-  ResponseHelper.asyncHandler(userController.assignRoles.bind(userController))
+  ...MiddlewareComposer.updateResource(
+    userController.assignRoles.bind(userController),
+    userSchemas.userId,
+    userSchemas.assignRoles,
+    "admin"
+  )
 );
 
 // Get user statistics (admin only)
 router.get(
   "/stats/overview",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireRole("admin"),
+  ...MiddlewareComposer.admin(),
   ResponseHelper.asyncHandler(userController.getUserStatistics.bind(userController))
 );
 

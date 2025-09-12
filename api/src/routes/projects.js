@@ -26,48 +26,49 @@ router.get(
 // Get project by ID
 router.get(
   "/:id",
-  AuthMiddleware.verifyToken,
-  ValidationMiddleware.validateParams(projectSchemas.projectId),
+  ...MiddlewareComposer.authWithParamValidation(projectSchemas.projectId),
   ResponseHelper.asyncHandler(projectController.getProjectById.bind(projectController))
 );
 
 // Deploy new project
 router.post(
   "/deploy",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireRole("admin"),
-  ValidationMiddleware.sanitizeInput,
-  ValidationMiddleware.validateBody(projectSchemas.deployProject),
-  ResponseHelper.asyncHandler(projectController.deployProject.bind(projectController))
+  ...MiddlewareComposer.createResource(
+    projectController.deployProject.bind(projectController),
+    projectSchemas.deployProject,
+    "admin"
+  )
 );
 
 // Update project
 router.put(
   "/:id",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireRole("admin"),
-  ValidationMiddleware.validateParams(projectSchemas.projectId),
-  ValidationMiddleware.sanitizeInput,
-  ValidationMiddleware.validateBody(projectSchemas.updateProject),
-  ResponseHelper.asyncHandler(projectController.updateProject.bind(projectController))
+  ...MiddlewareComposer.updateResource(
+    projectController.updateProject.bind(projectController),
+    projectSchemas.projectId,
+    projectSchemas.updateProject,
+    "admin"
+  )
 );
 
 // Delete project
 router.delete(
   "/:id",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireRole("admin"),
-  ValidationMiddleware.validateParams(projectSchemas.projectId),
-  ResponseHelper.asyncHandler(projectController.deleteProject.bind(projectController))
+  ...MiddlewareComposer.deleteResource(
+    projectController.deleteProject.bind(projectController),
+    projectSchemas.projectId,
+    "admin"
+  )
 );
 
 // Restart project
 router.post(
   "/:id/restart",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireRole("admin"),
-  ValidationMiddleware.validateParams(projectSchemas.projectId),
-  ResponseHelper.asyncHandler(projectController.restartProject.bind(projectController))
+  ...MiddlewareComposer.getResource(
+    projectController.restartProject.bind(projectController),
+    projectSchemas.projectId,
+    "admin"
+  )
 );
 
 // Get project logs
@@ -82,35 +83,37 @@ router.get(
 // Get project status
 router.get(
   "/:id/status",
-  AuthMiddleware.verifyToken,
-  ValidationMiddleware.validateParams(projectSchemas.projectId),
-  ResponseHelper.asyncHandler(projectController.getProjectStatus.bind(projectController))
+  ...MiddlewareComposer.getResource(
+    projectController.getProjectStatus.bind(projectController),
+    projectSchemas.projectId
+  )
 );
 
 // Get project statistics
 router.get(
   "/stats/overview",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireRole("admin"),
+  ...MiddlewareComposer.admin(),
   ResponseHelper.asyncHandler(projectController.getProjectStatistics.bind(projectController))
 );
 
 // Start project
 router.post(
   "/:id/start",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireRole("admin"),
-  ValidationMiddleware.validateParams(projectSchemas.projectId),
-  ResponseHelper.asyncHandler(projectController.startProject.bind(projectController))
+  ...MiddlewareComposer.getResource(
+    projectController.startProject.bind(projectController),
+    projectSchemas.projectId,
+    "admin"
+  )
 );
 
 // Stop project
 router.post(
   "/:id/stop",
-  AuthMiddleware.verifyToken,
-  AuthMiddleware.requireRole("admin"),
-  ValidationMiddleware.validateParams(projectSchemas.projectId),
-  ResponseHelper.asyncHandler(projectController.stopProject.bind(projectController))
+  ...MiddlewareComposer.getResource(
+    projectController.stopProject.bind(projectController),
+    projectSchemas.projectId,
+    "admin"
+  )
 );
 
 module.exports = router;
