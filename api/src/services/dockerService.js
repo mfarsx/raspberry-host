@@ -218,7 +218,7 @@ class DockerService extends BaseService {
       const { spawn } = require('child_process');
       
       return new Promise((resolve, reject) => {
-        const child = spawn('docker', ['compose', 'up', '-d'], {
+        const child = spawn('docker-compose', ['up', '-d'], {
           cwd: sanitizedPath,
           stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 300000 // 5 minutes timeout
@@ -316,7 +316,7 @@ class DockerService extends BaseService {
       const { spawn } = require('child_process');
       
       return new Promise((resolve, reject) => {
-        const child = spawn('docker', ['compose', 'down'], {
+        const child = spawn('docker-compose', ['down'], {
           cwd: sanitizedPath,
           stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 120000 // 2 minutes timeout
@@ -367,7 +367,7 @@ class DockerService extends BaseService {
       const sanitizedLines = Math.max(1, Math.min(10000, parseInt(lines) || 100));
       
       return new Promise((resolve, reject) => {
-        const child = spawn('docker', ['compose', '-f', composeFile, 'logs', '--tail', sanitizedLines.toString()], {
+        const child = spawn('docker-compose', ['-f', composeFile, 'logs', '--tail', sanitizedLines.toString()], {
           stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 60000 // 1 minute timeout
         });
@@ -415,7 +415,7 @@ class DockerService extends BaseService {
       const composeFile = path.join(sanitizedPath, 'compose.yaml');
       
       return new Promise((resolve, reject) => {
-        const child = spawn('docker', ['compose', '-f', composeFile, 'ps', '--format', 'json'], {
+        const child = spawn('docker-compose', ['-f', composeFile, 'ps', '--format', 'json'], {
           stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 30000 // 30 seconds timeout
         });
@@ -533,7 +533,7 @@ networks:
   async isDockerComposeAvailable() {
     try {
       return new Promise((resolve) => {
-        const child = spawn('docker', ['compose', 'version'], {
+        const child = spawn('docker-compose', ['version'], {
           stdio: ['pipe', 'pipe', 'pipe'],
           timeout: 5000 // 5 seconds timeout
         });

@@ -1,13 +1,15 @@
 # Node.js API - Multi-stage Dockerfile
 FROM node:18-alpine AS base
 
-# Install system dependencies including Git and Docker CLI
+# Install system dependencies including Git, Docker CLI, and Docker Compose
 RUN apk add --no-cache \
     curl \
     dumb-init \
     git \
     docker-cli \
-    && rm -rf /var/cache/apk/*
+    && rm -rf /var/cache/apk/* \
+    && curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose \
+    && chmod +x /usr/local/bin/docker-compose
 
 # Create app directory and user
 WORKDIR /app
