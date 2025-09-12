@@ -189,6 +189,21 @@ const projectSchemas = {
         'number.min': 'Lines must be at least 1',
         'number.max': 'Lines cannot exceed 10000'
       })
+  }),
+
+  updatePort: Joi.object({
+    port: Joi.number()
+      .integer()
+      .min(1)
+      .max(65535)
+      .required()
+      .messages({
+        'number.base': 'Port must be a number',
+        'number.integer': 'Port must be an integer',
+        'number.min': 'Port must be at least 1',
+        'number.max': 'Port cannot exceed 65535',
+        'any.required': 'Port is required'
+      })
   })
 };
 

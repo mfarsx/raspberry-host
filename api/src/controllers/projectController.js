@@ -234,6 +234,46 @@ class ProjectController {
       message: "Project stopped successfully",
     });
   }
+
+  /**
+   * Update project port
+   */
+  async updateProjectPort(req, res) {
+    try {
+      const { id } = req.params;
+      const { port } = req.body;
+
+      // Validate port in request body
+      if (!port || typeof port !== 'number') {
+        return ResponseHelper.badRequest(res, "Port number is required and must be a number");
+      }
+
+      const updatedProject = await this.projectService.updateProjectPort(id, port);
+
+      logger.info(`Project port updated: ${id} -> ${port}`);
+
+      return ResponseHelper.success(res, updatedProject, {
+        message: "Project port updated successfully",
+      });
+
+    } catch (error) {
+      logger.error('Update project port error:', error);
+      
+      if (error.message.includes('not found')) {
+        return ResponseHelper.notFound(res, "Project not found");
+      }
+      
+      if (error.message.includes('already in use')) {
+        return ResponseHelper.conflict(res, error.message);
+      }
+      
+      if (error.message.includes('Invalid port')) {
+        return ResponseHelper.badRequest(res, error.message);
+      }
+
+      return ResponseHelper.serverError(res, "Failed to update project port");
+    }
+  }
 }
 
 module.exports = ProjectController;

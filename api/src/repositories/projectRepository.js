@@ -252,6 +252,37 @@ class ProjectRepository {
       throw error;
     }
   }
+
+  /**
+   * Check if port is available
+   */
+  async isPortAvailable(port, excludeId = null) {
+    try {
+      const query = { port: parseInt(port) };
+      if (excludeId) {
+        query._id = { $ne: excludeId };
+      }
+      
+      const count = await Project.countDocuments(query);
+      return count === 0;
+    } catch (error) {
+      logger.error('Error checking port availability:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all used ports
+   */
+  async getUsedPorts() {
+    try {
+      const projects = await Project.find({}, 'port');
+      return projects.map(project => project.port);
+    } catch (error) {
+      logger.error('Error getting used ports:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new ProjectRepository();

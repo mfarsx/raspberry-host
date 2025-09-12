@@ -474,9 +474,11 @@ class DockerService extends BaseService {
       .map(([key, value]) => `      - ${key}=${value}`)
       .join('\n');
 
-    return `version: '3.8'
+    // Only include environment section if there are variables
+    const environmentSection = environmentVars ? `    environment:
+${environmentVars}` : '';
 
-services:
+    return `services:
   ${project.name}:
     build:
       context: .
@@ -486,17 +488,21 @@ services:
     container_name: ${project.name}
     restart: unless-stopped
     ports:
-      - "${project.port}:${project.port}"
-    environment:
-${environmentVars}
+      - "${project.port}:80"
+${environmentSection}
     volumes:
-      - ./logs:/app/logs
+      - ${project.name}_logs:/app/logs
     networks:
       - pi-network
 
 networks:
   pi-network:
     external: true
+    name: raspberry-host_pi-network
+
+volumes:
+  ${project.name}_logs:
+    driver: local
 `;
   }
 
@@ -855,6 +861,250 @@ networks:
     } catch (error) {
       this.logger.error('Failed to remove image:', error);
       throw new Error(`Failed to remove image: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get project logs stream for real-time streaming
+   * @param {string} projectPath - Path to the project
+   * @param {Object} options - Stream options
+   * @returns {Promise<Object>} Stream object with data events
+   */
+  async getProjectLogsStream(projectPath, options = {}) {
+    try {
+      const sanitizedPath = validateFilePath(projectPath, process.cwd());
+      const composeFile = path.join(sanitizedPath, 'compose.yaml');
+      
+      // Default options
+      const streamOptions = {
+        follow: true,
+        tail: options.tail || 100,
+        timestamps: true,
+        ...options
+      };
+
+      // Build docker-compose logs command
+      const args = ['-f', composeFile, 'logs'];
+      
+      if (streamOptions.follow) {
+        args.push('--follow');
+      }
+      
+      if (streamOptions.tail) {
+        args.push('--tail', streamOptions.tail.toString());
+      }
+      
+      if (streamOptions.timestamps) {
+        args.push('--timestamps');
+      }
+
+      return new Promise((resolve, reject) => {
+        const child = spawn('docker-compose', args, {
+          cwd: sanitizedPath,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        const stream = {
+          on: (event, callback) => {
+            if (event === 'data') {
+              child.stdout.on('data', callback);
+            } else if (event === 'error') {
+              child.on('error', callback);
+            } else if (event === 'end') {
+              child.on('close', (code) => {
+                if (code === 0) {
+                  callback();
+                } else {
+                  callback(new Error(`Log stream ended with code ${code}`));
+                }
+              });
+            }
+          },
+          close: () => {
+            child.kill('SIGTERM');
+          }
+        };
+
+        child.on('error', (error) => {
+          this.logger.error('Log stream error:', error);
+          reject(error);
+        });
+
+        resolve(stream);
+      });
+    } catch (error) {
+      this.logger.error('Failed to create log stream:', error);
+      throw new Error(`Failed to create log stream: ${error.message}`);
+    }
+  }
+
+  /**
+   * Parse Docker log entry
+   * @param {string} logLine - Raw log line
+   * @returns {Object} Parsed log entry
+   */
+  parseLogEntry(logLine) {
+    // Docker Compose log format: [timestamp] [container] [stream] message
+    const match = logLine.match(/^\[([^\]]+)\] \[([^\]]+)\] \[([^\]]+)\] (.+)$/);
+    
+    if (match) {
+      return {
+        timestamp: match[1],
+        container: match[2],
+        stream: match[3], // stdout/stderr
+        message: match[4],
+        raw: logLine
+      };
+    }
+    
+    // Fallback for non-standard format
+    return {
+      timestamp: new Date().toISOString(),
+      container: 'unknown',
+      stream: 'unknown',
+      message: logLine,
+      raw: logLine
+    };
+  }
+
+  /**
+   * Create Docker exec session for console access
+   * @param {string} containerName - Container name
+   * @param {Object} options - Exec options
+   * @returns {Promise<string>} Exec session ID
+   */
+  async createExecSession(containerName, options = {}) {
+    try {
+      const sanitizedContainer = sanitizeCommandInput(containerName);
+      
+      const execOptions = {
+        Cmd: options.cmd || ['/bin/sh'],
+        AttachStdin: true,
+        AttachStdout: true,
+        AttachStderr: true,
+        Tty: true,
+        ...options
+      };
+
+      return new Promise((resolve, reject) => {
+        const child = spawn('docker', ['exec', '-it', sanitizedContainer, ...execOptions.Cmd], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          timeout: 30000
+        });
+
+        const execSession = {
+          id: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          containerName: sanitizedContainer,
+          child: child,
+          createdAt: new Date(),
+          options: execOptions
+        };
+
+        child.on('error', (error) => {
+          this.logger.error('Docker exec session error:', error);
+          reject(error);
+        });
+
+        child.on('spawn', () => {
+          this.logger.info(`Docker exec session created: ${execSession.id}`);
+          resolve(execSession);
+        });
+      });
+    } catch (error) {
+      this.logger.error('Failed to create exec session:', error);
+      throw new Error(`Failed to create exec session: ${error.message}`);
+    }
+  }
+
+  /**
+   * Send input to Docker exec session
+   * @param {Object} execSession - Exec session object
+   * @param {string} input - Input data
+   * @returns {Promise<void>}
+   */
+  async sendToExecSession(execSession, input) {
+    try {
+      if (execSession.child && execSession.child.stdin) {
+        execSession.child.stdin.write(input);
+      }
+    } catch (error) {
+      this.logger.error('Failed to send input to exec session:', error);
+      throw new Error(`Failed to send input: ${error.message}`);
+    }
+  }
+
+  /**
+   * Resize Docker exec session terminal
+   * @param {Object} execSession - Exec session object
+   * @param {number} cols - Terminal columns
+   * @param {number} rows - Terminal rows
+   * @returns {Promise<void>}
+   */
+  async resizeExecSession(execSession, cols, rows) {
+    try {
+      if (execSession.child && execSession.child.stdout) {
+        // Send resize signal (this is a simplified approach)
+        // In a real implementation, you might need to use docker exec with resize
+        this.logger.debug(`Resizing exec session ${execSession.id} to ${cols}x${rows}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to resize exec session:', error);
+      throw new Error(`Failed to resize session: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get exec session stream for real-time communication
+   * @param {Object} execSession - Exec session object
+   * @returns {Object} Stream object with data events
+   */
+  getExecSessionStream(execSession) {
+    try {
+      const stream = {
+        on: (event, callback) => {
+          if (event === 'data') {
+            execSession.child.stdout.on('data', callback);
+          } else if (event === 'error') {
+            execSession.child.stderr.on('data', callback);
+          } else if (event === 'end') {
+            execSession.child.on('close', (code) => {
+              callback(code === 0 ? null : new Error(`Exec session ended with code ${code}`));
+            });
+          }
+        },
+        close: () => {
+          if (execSession.child) {
+            execSession.child.kill('SIGTERM');
+          }
+        },
+        write: (data) => {
+          if (execSession.child && execSession.child.stdin) {
+            execSession.child.stdin.write(data);
+          }
+        }
+      };
+
+      return stream;
+    } catch (error) {
+      this.logger.error('Failed to get exec session stream:', error);
+      throw new Error(`Failed to get stream: ${error.message}`);
+    }
+  }
+
+  /**
+   * Close Docker exec session
+   * @param {Object} execSession - Exec session object
+   * @returns {Promise<void>}
+   */
+  async closeExecSession(execSession) {
+    try {
+      if (execSession.child) {
+        execSession.child.kill('SIGTERM');
+        this.logger.info(`Docker exec session closed: ${execSession.id}`);
+      }
+    } catch (error) {
+      this.logger.error('Failed to close exec session:', error);
+      throw new Error(`Failed to close session: ${error.message}`);
     }
   }
 }

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import apiClient from '../config/axios';
 import { useWebSocket } from '../hooks/useWebSocket';
+import LogViewer from './LogViewer';
+import ProjectConsole from './ProjectConsole';
 import { 
   RotateCcw, 
   Trash2, 
@@ -13,7 +15,9 @@ import {
   Square,
   Play,
   Wifi,
-  WifiOff
+  WifiOff,
+  Edit3,
+  Terminal
 } from 'lucide-react';
 
 const ProjectManagement = () => {
@@ -25,6 +29,14 @@ const ProjectManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [liveLogs, setLiveLogs] = useState(false);
+  const [showPortModal, setShowPortModal] = useState(false);
+  const [portChangeProject, setPortChangeProject] = useState(null);
+  const [newPort, setNewPort] = useState('');
+  const [portChangeLoading, setPortChangeLoading] = useState(false);
+  const [showLogViewer, setShowLogViewer] = useState(false);
+  const [logViewerProject, setLogViewerProject] = useState(null);
+  const [showConsole, setShowConsole] = useState(false);
+  const [consoleProject, setConsoleProject] = useState(null);
   const { isConnected, socket } = useWebSocket();
 
   useEffect(() => {
@@ -129,20 +141,93 @@ const ProjectManagement = () => {
     }
   };
 
+  const handlePortChange = (project) => {
+    setPortChangeProject(project);
+    setNewPort(project.port.toString());
+    setShowPortModal(true);
+  };
+
+  const handlePortUpdate = async () => {
+    if (!portChangeProject || !newPort) {
+      toast.error('Please enter a valid port number');
+      return;
+    }
+
+    const portNumber = parseInt(newPort);
+    if (isNaN(portNumber) || portNumber < 1 || portNumber > 65535) {
+      toast.error('Port must be a number between 1 and 65535');
+      return;
+    }
+
+    if (portNumber === portChangeProject.port) {
+      toast.error('New port must be different from current port');
+      return;
+    }
+
+    setPortChangeLoading(true);
+
+    try {
+      const response = await apiClient.put(`/projects/${portChangeProject.id}/port`, {
+        port: portNumber
+      });
+
+      toast.success('Port updated successfully');
+      setShowPortModal(false);
+      setPortChangeProject(null);
+      setNewPort('');
+      fetchProjects();
+    } catch (error) {
+      console.error('Port change error:', error);
+      
+      if (error.response?.status === 409) {
+        toast.error(error.response.data.error || 'Port is already in use');
+      } else if (error.response?.status === 400) {
+        toast.error(error.response.data.error || 'Invalid port number');
+      } else {
+        toast.error('Failed to update port');
+      }
+    } finally {
+      setPortChangeLoading(false);
+    }
+  };
+
+  const closePortModal = () => {
+    setShowPortModal(false);
+    setPortChangeProject(null);
+    setNewPort('');
+    setPortChangeLoading(false);
+  };
+
   const handleViewLogs = async (projectId) => {
     try {
-      const response = await apiClient.get(`/projects/${projectId}/logs`);
-      setLogs(response.data.data || []);
-      setSelectedProject(projectId);
-      setShowLogs(true);
-      
-      // Subscribe to live logs if WebSocket is connected
-      if (socket && isConnected) {
-        socket.emit('subscribe_logs', { projectId });
+      const project = projects.find(p => p.id === projectId);
+      if (project) {
+        setLogViewerProject(project);
+        setShowLogViewer(true);
       }
     } catch (error) {
-      toast.error('Failed to fetch logs');
+      console.error('Log viewer error:', error);
+      toast.error('Failed to open log viewer');
     }
+  };
+
+  const closeLogViewer = () => {
+    setShowLogViewer(false);
+    setLogViewerProject(null);
+  };
+
+  const handleOpenConsole = (project) => {
+    if (project.status !== 'running') {
+      toast.error('Project must be running to access console');
+      return;
+    }
+    setConsoleProject(project);
+    setShowConsole(true);
+  };
+
+  const closeConsole = () => {
+    setShowConsole(false);
+    setConsoleProject(null);
   };
 
   const toggleLiveLogs = () => {
@@ -306,42 +391,50 @@ const ProjectManagement = () => {
                   </div>
                   <div className="flex gap-2">
                     <button
-                      className="btn btn-secondary"
+                      className="btn btn-secondary btn-small"
                       onClick={() => handleViewLogs(project.id)}
                       title="View Logs"
                     >
-                      <Eye size={16} />
+                      <Eye size={14} />
+                    </button>
+                    <button
+                      className="btn btn-info btn-small"
+                      onClick={() => handleOpenConsole(project)}
+                      title="Open Console"
+                      disabled={project.status !== 'running'}
+                    >
+                      <Terminal size={14} />
                     </button>
                     {project.status === 'running' ? (
                       <button
-                        className="btn btn-warning"
+                        className="btn btn-warning btn-small"
                         onClick={() => handleStopProject(project.id)}
                         title="Stop Project"
                       >
-                        <Square size={16} />
+                        <Square size={14} />
                       </button>
                     ) : (
                       <button
-                        className="btn btn-success"
+                        className="btn btn-success btn-small"
                         onClick={() => handleStartProject(project.id)}
                         title="Start Project"
                       >
-                        <Play size={16} />
+                        <Play size={14} />
                       </button>
                     )}
                     <button
-                      className="btn btn-info"
+                      className="btn btn-info btn-small"
                       onClick={() => handleRestartProject(project.id)}
                       title="Restart Project"
                     >
-                      <RotateCcw size={16} />
+                      <RotateCcw size={14} />
                     </button>
                     <button
-                      className="btn btn-danger"
+                      className="btn btn-danger btn-small"
                       onClick={() => handleDeleteProject(project.id)}
                       title="Delete Project"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
@@ -355,6 +448,13 @@ const ProjectManagement = () => {
                   <div className="flex items-center gap-2">
                     <Settings size={16} className="text-gray-500" />
                     <span className="text-sm">Port: {project.port}</span>
+                    <button
+                      className="btn btn-secondary btn-small ml-2"
+                      onClick={() => handlePortChange(project)}
+                      title="Change Port"
+                    >
+                      <Edit3 size={12} />
+                    </button>
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -448,6 +548,75 @@ const ProjectManagement = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Port Change Modal */}
+      {showPortModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-96 max-w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">Change Port</h3>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Project: {portChangeProject?.name}
+              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Current Port: {portChangeProject?.port}
+              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                New Port:
+              </label>
+              <input
+                type="number"
+                value={newPort}
+                onChange={(e) => setNewPort(e.target.value)}
+                className="form-input w-full"
+                placeholder="Enter new port (1-65535)"
+                min="1"
+                max="65535"
+                disabled={portChangeLoading}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Port must be between 1 and 65535
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                className="btn btn-secondary"
+                onClick={closePortModal}
+                disabled={portChangeLoading}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handlePortUpdate}
+                disabled={portChangeLoading}
+              >
+                {portChangeLoading ? 'Updating...' : 'Update Port'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Real-time Log Viewer */}
+      {showLogViewer && logViewerProject && (
+        <LogViewer
+          projectId={logViewerProject.id}
+          projectName={logViewerProject.name}
+          onClose={closeLogViewer}
+        />
+      )}
+
+      {/* Project Console */}
+      {showConsole && consoleProject && (
+        <ProjectConsole
+          projectId={consoleProject.id}
+          projectName={consoleProject.name}
+          onClose={closeConsole}
+        />
       )}
     </div>
   );

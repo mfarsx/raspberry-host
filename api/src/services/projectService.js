@@ -443,6 +443,78 @@ class ProjectService extends BaseService {
       return false;
     }
   }
+
+  /**
+   * Update project port
+   * @param {string} id - Project ID
+   * @param {number} newPort - New port number
+   * @returns {Promise<Object|null>} Updated project or null
+   */
+  async updateProjectPort(id, newPort) {
+    try {
+      // Validate port number
+      if (!this.isValidPort(newPort)) {
+        throw new Error('Invalid port number. Port must be between 1 and 65535');
+      }
+
+      // Get current project
+      const project = await this.getProjectById(id);
+      if (!project) {
+        throw new Error('Project not found');
+      }
+
+      // Check if port is already in use by another project
+      const portAvailable = await this.getProjectRepository().isPortAvailable(newPort, id);
+      if (!portAvailable) {
+        throw new Error(`Port ${newPort} is already in use by another project`);
+      }
+
+      // If project is running, stop it first
+      const wasRunning = project.status === 'running';
+      if (wasRunning) {
+        this.logger.info(`Stopping project ${project.name} for port change`);
+        await this.stopProject(id);
+      }
+
+      // Update project port in database
+      const updatedProject = await this.getProjectRepository().update(id, { 
+        port: newPort,
+        updatedAt: new Date()
+      });
+
+      if (!updatedProject) {
+        throw new Error('Failed to update project port in database');
+      }
+
+      // Regenerate Docker Compose file with new port
+      const projectPath = path.join(this.projectsDir, project.name);
+      const projectWithNewPort = { ...project, port: newPort };
+      await this.dockerService.createProjectCompose(projectWithNewPort, projectPath);
+
+      // If project was running, start it again with new port
+      if (wasRunning) {
+        this.logger.info(`Starting project ${project.name} with new port ${newPort}`);
+        await this.startProject(id);
+      }
+
+      this.logger.info(`Project port updated: ${project.name} -> ${newPort}`);
+      return updatedProject;
+
+    } catch (error) {
+      this.logger.error("Failed to update project port:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Validate port number
+   * @param {number} port - Port number to validate
+   * @returns {boolean} True if valid
+   */
+  isValidPort(port) {
+    const portNum = parseInt(port);
+    return !isNaN(portNum) && portNum >= 1 && portNum <= 65535;
+  }
 }
 
 module.exports = {

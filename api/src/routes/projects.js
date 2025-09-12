@@ -116,4 +116,15 @@ router.post(
   )
 );
 
+// Update project port
+router.put(
+  "/:id/port",
+  ...MiddlewareComposer.updateResource(
+    projectController.updateProjectPort.bind(projectController),
+    projectSchemas.projectId,
+    projectSchemas.updatePort,
+    "admin"
+  )
+);
+
 module.exports = router;

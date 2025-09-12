@@ -240,25 +240,27 @@ const DashboardRefactored = React.memo(() => {
         ) : (
           <div className="grid grid-2">
             {projects.slice(0, 4).map((project, index) => (
-              <div key={project.id || `project-${index}`} className="border rounded-lg p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold">{project.name}</h3>
-                  <span
-                    className={`status-indicator ${getStatusColor(
-                      project.status
-                    )}`}
-                  ></span>
-                </div>
-                <p className="text-sm text-gray-600 mb-2">{project.domain}</p>
-                <div className="text-xs text-gray-500">
-                  <div>Port: {project.port}</div>
-                  <div>Status: {project.status}</div>
-                  {project.lastDeployed && (
-                    <div>
-                      Deployed:{" "}
-                      {new Date(project.lastDeployed).toLocaleDateString()}
+              <div key={project.id || `project-${index}`} className="card">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">{project.name}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`status-indicator ${getStatusColor(project.status)}`}></span>
+                      <span className="text-sm capitalize">{project.status}</span>
                     </div>
-                  )}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-gray-600">{project.domain}</p>
+                  <div className="text-xs text-gray-500 space-y-1">
+                    <div>Port: {project.port}</div>
+                    {project.lastDeployed && (
+                      <div>
+                        Deployed:{" "}
+                        {new Date(project.lastDeployed).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
