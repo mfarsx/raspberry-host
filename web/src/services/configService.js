@@ -137,7 +137,7 @@ class ConfigService {
         timestamps: true
       },
       websocket: {
-        url: 'http://localhost:3001',
+        url: process.env.REACT_APP_WS_URL || 'http://localhost:3001',
         reconnectAttempts: 5,
         reconnectDelay: 1000
       },

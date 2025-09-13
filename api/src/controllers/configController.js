@@ -41,7 +41,7 @@ class ConfigController {
   getSystemConfig(req, res) {
     try {
       const systemConfig = {
-        defaultPort: parseInt(process.env.DEFAULT_PORT) || 3000,
+        defaultPort: 3000,
         refreshInterval: parseInt(process.env.REFRESH_INTERVAL) || 30000,
         shell: process.env.DEFAULT_SHELL || "/bin/sh",
         logConfig: {
