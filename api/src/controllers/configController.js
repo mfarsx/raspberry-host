@@ -166,7 +166,7 @@ class ConfigController {
   }
 
   getAllowedPorts() {
-    const portsStr = process.env.ALLOWED_PORTS || "3000,3001,8080,8081,9000,9001";
+    const portsStr = process.env.ALLOWED_PORTS || "3000,3001,8080,8081,9000,9001,9002,9003,9004,9005,9006,9007,9008,9009,9010";
     return portsStr.split(',').map(port => parseInt(port.trim())).filter(port => !isNaN(port));
   }
 

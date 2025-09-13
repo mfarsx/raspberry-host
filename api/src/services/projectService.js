@@ -170,8 +170,17 @@ class ProjectService extends BaseService {
    */
   async deployProject(projectData) {
     const id = this.generateProjectId(projectData.name);
+    
+    // Auto-allocate port if not provided or if provided port is not available
+    let port = projectData.port;
+    if (!port || !(await this.getProjectRepository().isPortAvailable(port))) {
+      port = await this.getProjectRepository().getNextAvailablePort();
+      this.logger.info(`Auto-allocated port ${port} for project ${projectData.name}`);
+    }
+    
     const project = {
       ...projectData,
+      port,
       id,
       status: "deploying",
       createdAt: new Date(),

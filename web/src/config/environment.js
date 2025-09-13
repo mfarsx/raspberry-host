@@ -8,6 +8,7 @@ const config = {
   // App Configuration
   APP_NAME: process.env.REACT_APP_NAME || 'Raspberry Pi Hosting Platform',
   APP_VERSION: process.env.REACT_APP_VERSION || '1.0.0',
+  APP_PORT: process.env.REACT_APP_PORT || '3000',
   
   // Feature Flags
   ENABLE_DEVTOOLS: process.env.NODE_ENV === 'development',

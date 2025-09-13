@@ -283,6 +283,46 @@ class ProjectRepository {
       throw error;
     }
   }
+
+  /**
+   * Get next available port from allowed range
+   */
+  async getNextAvailablePort(allowedPorts = null) {
+    try {
+      const usedPorts = await this.getUsedPorts();
+      const allowed = allowedPorts || this.getAllowedPorts();
+      
+      // Find first available port in allowed range
+      for (const port of allowed) {
+        if (!usedPorts.includes(port)) {
+          return port;
+        }
+      }
+      
+      // If no port available in allowed range, find next available port
+      const minPort = Math.min(...allowed);
+      const maxPort = Math.max(...allowed);
+      
+      for (let port = minPort; port <= maxPort + 100; port++) {
+        if (!usedPorts.includes(port) && port >= 3000) {
+          return port;
+        }
+      }
+      
+      throw new Error('No available ports found');
+    } catch (error) {
+      logger.error('Error getting next available port:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get allowed ports from configuration
+   */
+  getAllowedPorts() {
+    const portsStr = process.env.ALLOWED_PORTS || "3000,3001,8080,8081,9000,9001,9002,9003,9004,9005";
+    return portsStr.split(',').map(port => parseInt(port.trim())).filter(port => !isNaN(port));
+  }
 }
 
 module.exports = new ProjectRepository();

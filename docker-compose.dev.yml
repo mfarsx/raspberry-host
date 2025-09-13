@@ -43,16 +43,17 @@ services:
     container_name: pi-web-dev
     restart: unless-stopped
     working_dir: /app
-    command: sh -c "npm install && NODE_OPTIONS='--no-deprecation' npm start"
+    command: sh -c "npm install && PORT=${REACT_APP_PORT:-3000} NODE_OPTIONS='--no-deprecation' npm start"
     environment:
       - REACT_APP_API_URL=http://localhost:3001/api
       - REACT_APP_WS_URL=ws://localhost:3001
+      - REACT_APP_PORT=${REACT_APP_PORT:-3000}
       - REACT_APP_ENV=development
       - NODE_NO_WARNINGS=1
     volumes:
       - ./web:/app
     ports:
-      - "3000:3000"
+      - "${REACT_APP_PORT:-3000}:${REACT_APP_PORT:-3000}"
     networks:
       - pi-network
 

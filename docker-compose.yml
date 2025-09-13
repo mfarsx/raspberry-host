@@ -92,11 +92,13 @@ services:
     environment:
       - REACT_APP_API_URL=https://${DOMAIN}/api
       - REACT_APP_WS_URL=wss://${DOMAIN}/ws
+      - REACT_APP_PORT=${REACT_APP_PORT:-3000}
+      - WEB_PORT=${WEB_PORT:-80}
       - REACT_APP_ENV=production
     volumes:
       - web_build:/app/build
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:80" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:${WEB_PORT:-80}" ]
       interval: 30s
       timeout: 10s
       retries: 3

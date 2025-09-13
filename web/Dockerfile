@@ -37,13 +37,13 @@ RUN npm run build
 
 # Production stage with nginx
 FROM nginx:alpine AS production
-RUN apk add --no-cache curl && rm -rf /var/cache/apk/*
-COPY nginx.conf /etc/nginx/nginx.conf
+RUN apk add --no-cache curl gettext && rm -rf /var/cache/apk/*
+COPY nginx.conf.template /etc/nginx/nginx.conf.template
 COPY --from=build /app/build /usr/share/nginx/html
 RUN chown -R nginx:nginx /usr/share/nginx/html /var/cache/nginx /var/log/nginx /etc/nginx/conf.d && \
     touch /var/run/nginx.pid && chown -R nginx:nginx /var/run/nginx.pid
 USER nginx
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:80 || exit 1
-EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+    CMD curl -f http://localhost:${WEB_PORT:-80} || exit 1
+EXPOSE ${WEB_PORT:-80}
+CMD envsubst '${WEB_PORT}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && nginx -g 'daemon off;'

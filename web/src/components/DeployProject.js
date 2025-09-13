@@ -26,7 +26,7 @@ const DeployProject = () => {
     branch: 'main',
     buildCommand: '',
     startCommand: '',
-    port: systemConfig?.defaultPort || 3000,
+    port: '', // Empty for auto-allocation
     environment: {}
   });
   const [envVars, setEnvVars] = useState([]);
@@ -100,7 +100,7 @@ const DeployProject = () => {
           branch: 'main',
           buildCommand: '',
           startCommand: '',
-          port: systemConfig?.defaultPort || 3000,
+          port: '', // Empty for auto-allocation
           environment: {}
         });
         setEnvVars([]);
@@ -245,7 +245,7 @@ const DeployProject = () => {
           <div className="form-group">
             <label className="form-label">
               <Settings size={16} className="inline mr-2" />
-              Port
+              Port (Optional - Auto-allocated if empty)
             </label>
             <input
               type="number"
@@ -255,7 +255,11 @@ const DeployProject = () => {
               className="form-input"
               min="1"
               max="65535"
+              placeholder="Leave empty for auto-allocation"
             />
+            <div className="text-sm text-gray-500 mt-1">
+              If left empty, the system will automatically assign an available port from the allowed range.
+            </div>
           </div>
 
           {/* Environment Variables */}
