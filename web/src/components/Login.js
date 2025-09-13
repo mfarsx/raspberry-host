@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import apiClient from '../config/axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useUIConfig } from '../contexts/ConfigContext';
 import { 
   LogIn, 
   Mail, 
@@ -14,6 +15,7 @@ import {
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const uiConfig = useUIConfig();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -86,7 +88,7 @@ const Login = () => {
             value={formData.email}
             onChange={handleInputChange}
             className="form-input"
-            placeholder="admin@example.com"
+            placeholder={uiConfig?.placeholders?.email || "admin@example.com"}
             required
           />
         </div>
@@ -149,8 +151,8 @@ const Login = () => {
       <div className="mt-6 p-4 bg-blue-50 rounded-lg">
         <h4 className="font-semibold mb-2 text-blue-800">Demo Credentials</h4>
         <p className="text-sm text-blue-700">
-          <strong>Email:</strong> admin@example.com<br />
-          <strong>Password:</strong> password
+          <strong>Email:</strong> {uiConfig?.demoCredentials?.email || "admin@example.com"}<br />
+          <strong>Password:</strong> {uiConfig?.demoCredentials?.password || "password"}
         </p>
       </div>
     </div>

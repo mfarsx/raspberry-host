@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../config/axios';
 import { RefreshCw, Server, Database, Cpu, MemoryStick, HardDrive, Thermometer } from 'lucide-react';
+import { useSystemConfig } from '../contexts/ConfigContext';
 
 const SystemInfo = () => {
+  const systemConfig = useSystemConfig();
   const [systemInfo, setSystemInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -29,7 +31,7 @@ const SystemInfo = () => {
     fetchSystemInfo();
     
     // Set up interval for periodic updates
-    intervalId = setInterval(fetchSystemInfo, 30000); // Update every 30 seconds
+    intervalId = setInterval(fetchSystemInfo, systemConfig?.refreshInterval || 30000); // Update every 30 seconds
 
     // Cleanup function
     return () => {

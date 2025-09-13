@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
+import { useSystemConfig } from '../contexts/ConfigContext';
 import { 
   Terminal, 
   Square, 
@@ -10,6 +11,7 @@ import {
 } from 'lucide-react';
 
 const ProjectConsole = ({ projectId, projectName, onClose }) => {
+  const systemConfig = useSystemConfig();
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -22,7 +24,8 @@ const ProjectConsole = ({ projectId, projectName, onClose }) => {
 
   useEffect(() => {
     // Initialize Socket.IO connection
-    const newSocket = io(process.env.REACT_APP_API_URL || 'http://localhost:3001', {
+    const wsUrl = systemConfig?.websocket?.url || process.env.REACT_APP_API_URL || 'http://localhost:3001';
+    const newSocket = io(wsUrl, {
       transports: ['websocket', 'polling']
     });
 
@@ -75,7 +78,7 @@ const ProjectConsole = ({ projectId, projectName, onClose }) => {
       socket.emit('start_console', {
         projectId,
         options: {
-          shell: ['/bin/sh']
+          shell: [systemConfig?.shell || '/bin/sh']
         }
       });
     }

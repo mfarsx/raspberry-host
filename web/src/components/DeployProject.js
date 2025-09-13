@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import apiClient from '../config/axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useSystemConfig, useUIConfig } from '../contexts/ConfigContext';
 import { 
   Upload, 
   GitBranch, 
@@ -15,6 +16,9 @@ import {
 
 const DeployProject = () => {
   const { user, isAuthenticated, hasRole } = useAuth();
+  const systemConfig = useSystemConfig();
+  const uiConfig = useUIConfig();
+  
   const [formData, setFormData] = useState({
     name: '',
     domain: '',
@@ -22,7 +26,7 @@ const DeployProject = () => {
     branch: 'main',
     buildCommand: '',
     startCommand: '',
-    port: 3000,
+    port: systemConfig?.defaultPort || 3000,
     environment: {}
   });
   const [envVars, setEnvVars] = useState([]);
@@ -96,7 +100,7 @@ const DeployProject = () => {
           branch: 'main',
           buildCommand: '',
           startCommand: '',
-          port: 3000,
+          port: systemConfig?.defaultPort || 3000,
           environment: {}
         });
         setEnvVars([]);
@@ -150,7 +154,7 @@ const DeployProject = () => {
                 value={formData.name}
                 onChange={handleInputChange}
                 className="form-input"
-                placeholder="my-awesome-project"
+                placeholder={uiConfig?.placeholders?.projectName || "my-awesome-project"}
                 required
               />
             </div>
@@ -166,7 +170,7 @@ const DeployProject = () => {
                 value={formData.domain}
                 onChange={handleInputChange}
                 className="form-input"
-                placeholder="myproject.example.com"
+                placeholder={uiConfig?.placeholders?.domain || "myproject.example.com"}
                 required
               />
             </div>
@@ -185,7 +189,7 @@ const DeployProject = () => {
                 value={formData.repository}
                 onChange={handleInputChange}
                 className="form-input"
-                placeholder="https://github.com/username/repository.git"
+                placeholder={uiConfig?.placeholders?.repository || "https://github.com/username/repository.git"}
                 required
               />
             </div>

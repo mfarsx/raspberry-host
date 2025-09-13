@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
+import { useSystemConfig } from '../contexts/ConfigContext';
 import { 
   Play, 
   Square, 
@@ -12,6 +13,7 @@ import {
 } from 'lucide-react';
 
 const LogViewer = ({ projectId, projectName, onClose }) => {
+  const systemConfig = useSystemConfig();
   const [socket, setSocket] = useState(null);
   const [logs, setLogs] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -30,7 +32,8 @@ const LogViewer = ({ projectId, projectName, onClose }) => {
 
   useEffect(() => {
     // Initialize Socket.IO connection
-    const newSocket = io(process.env.REACT_APP_API_URL || 'http://localhost:3001', {
+    const wsUrl = systemConfig?.websocket?.url || process.env.REACT_APP_API_URL || 'http://localhost:3001';
+    const newSocket = io(wsUrl, {
       transports: ['websocket', 'polling']
     });
 
@@ -85,9 +88,9 @@ const LogViewer = ({ projectId, projectName, onClose }) => {
       socket.emit('start_log_stream', {
         projectId,
         options: {
-          tail: 100,
-          follow: true,
-          timestamps: true
+          tail: systemConfig?.logConfig?.tail || 100,
+          follow: systemConfig?.logConfig?.follow !== false,
+          timestamps: systemConfig?.logConfig?.timestamps !== false
         }
       });
       setIsStreaming(true);

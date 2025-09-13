@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '../config/axios';
 import toast from 'react-hot-toast';
+import { useSystemConfig } from '../contexts/ConfigContext';
 import { 
   Database, 
   RefreshCw, 
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 
 const DatabaseMonitoring = () => {
+  const systemConfig = useSystemConfig();
   const [dbData, setDbData] = useState(null);
   const [redisData, setRedisData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,7 @@ const DatabaseMonitoring = () => {
     fetchDatabaseInfo();
     
     // Refresh every 30 seconds
-    const interval = setInterval(fetchDatabaseInfo, 30000);
+    const interval = setInterval(fetchDatabaseInfo, systemConfig?.refreshInterval || 30000);
     return () => clearInterval(interval);
   }, []);
 

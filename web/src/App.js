@@ -18,6 +18,7 @@ import LoadingSpinner from "./components/LoadingSpinner";
 import { useApiHealth } from "./hooks/useApiHealth";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ConfigProvider, useConfig } from "./contexts/ConfigContext";
 
 // Lazy load components for better performance
 const DashboardRefactored = lazy(() =>
@@ -75,6 +76,7 @@ const AppContent = () => {
   const { data: apiHealth } = useApiHealth();
   const { isConnected: socketConnected } = useWebSocket();
   const { isAuthenticated, user, logout } = useAuth();
+  const { appConfig, loading: configLoading } = useConfig();
 
   // Memoize navigation items for better performance
   const navigationItems = useMemo(
@@ -96,7 +98,7 @@ const AppContent = () => {
           <nav className="container" style={{ paddingTop: "20px" }}>
             <div className="card">
               <h1 style={{ margin: "0 0 20px 0", color: "#333" }}>
-                🍓 Raspberry Pi 5 Hosting Platform
+                {appConfig?.branding?.logo || "🍓"} {appConfig?.name || "Raspberry Pi 5 Hosting Platform"}
               </h1>
               <div
                 style={{
@@ -220,10 +222,12 @@ const AppContent = () => {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AppContent />
-        <ReactQueryDevtools initialIsOpen={false} />
-      </AuthProvider>
+      <ConfigProvider>
+        <AuthProvider>
+          <AppContent />
+          <ReactQueryDevtools initialIsOpen={false} />
+        </AuthProvider>
+      </ConfigProvider>
     </QueryClientProvider>
   );
 }

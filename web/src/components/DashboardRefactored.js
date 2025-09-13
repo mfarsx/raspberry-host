@@ -5,6 +5,7 @@ import apiClient from "../config/axios";
 import LoadingSpinner from "./LoadingSpinner";
 import ErrorMessage from "./ErrorMessage";
 import { useWebSocket } from "../hooks/useWebSocket";
+import { useAppConfig, useSystemConfig, useUIConfig } from "../contexts/ConfigContext";
 import {
   Server,
   Database,
@@ -19,6 +20,10 @@ import {
 
 const DashboardRefactored = React.memo(() => {
   const { isConnected: socketConnected } = useWebSocket();
+  const appConfig = useAppConfig();
+  const systemConfig = useSystemConfig();
+  const uiConfig = useUIConfig();
+  
   const {
     data: projects = [],
     isLoading: projectsLoading,
@@ -30,7 +35,7 @@ const DashboardRefactored = React.memo(() => {
       const response = await apiClient.get("/projects");
       return response.data.data || [];
     },
-    refetchInterval: 30000,
+    refetchInterval: systemConfig?.refreshInterval || 30000,
     retry: 2,
   });
 
@@ -45,7 +50,7 @@ const DashboardRefactored = React.memo(() => {
       const response = await apiClient.get("/stats");
       return response.data;
     },
-    refetchInterval: 30000,
+    refetchInterval: systemConfig?.refreshInterval || 30000,
     retry: 2,
   });
 
@@ -132,8 +137,7 @@ const DashboardRefactored = React.memo(() => {
         </div>
 
         <p className="text-gray-600 mb-6">
-          Welcome to your personal hosting platform! Deploy and manage multiple
-          websites and applications.
+          {uiConfig?.messages?.welcomeMessage || "Welcome to your personal hosting platform! Deploy and manage multiple websites and applications."}
         </p>
 
         <div className="grid grid-4">
@@ -151,13 +155,13 @@ const DashboardRefactored = React.memo(() => {
 
           <div className="text-center">
             <Server size={32} className="mx-auto mb-2 text-purple-500" />
-            <h3 className="text-2xl font-bold">ARM64</h3>
+            <h3 className="text-2xl font-bold">{appConfig?.platform || "ARM64"}</h3>
             <p className="text-gray-600">Platform</p>
           </div>
 
           <div className="text-center">
             <Zap size={32} className="mx-auto mb-2 text-yellow-500" />
-            <h3 className="text-2xl font-bold">Auto SSL</h3>
+            <h3 className="text-2xl font-bold">{appConfig?.features?.autoSSL ? "Auto SSL" : "Manual SSL"}</h3>
             <p className="text-gray-600">HTTPS</p>
           </div>
         </div>
@@ -231,7 +235,7 @@ const DashboardRefactored = React.memo(() => {
             <HardDrive size={48} className="mx-auto mb-4 text-gray-400" />
             <h3>No projects deployed yet</h3>
             <p className="text-gray-600 mb-4">
-              Deploy your first project to get started
+              {uiConfig?.messages?.noProjectsMessage || "Deploy your first project to get started"}
             </p>
             <a href="/deploy" className="btn">
               Deploy Project
