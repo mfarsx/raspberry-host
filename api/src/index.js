@@ -13,6 +13,7 @@ const projectRoutes = require('./routes/projects');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const dockerRoutes = require('./routes/docker');
+const configRoutes = require('./routes/config');
 const { connectDatabase } = require('./config/database');
 const { connectRedis } = require('./config/redis');
 const { logger, requestLogger, performanceLogger } = require('./config/logger');
@@ -87,6 +88,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/docker', dockerRoutes);
+app.use('/api/config', configRoutes);
 app.use('/api', apiRoutes);
 
 // WebSocket setup

@@ -18,6 +18,11 @@ class ApiController {
         health: "/api/health",
         stats: "/api/stats",
         system: "/api/system",
+        config: "/api/config",
+        projects: "/api/projects",
+        auth: "/api/auth",
+        users: "/api/users",
+        docker: "/api/docker"
       },
     });
   }
