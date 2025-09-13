@@ -261,12 +261,23 @@ class ProjectService extends BaseService {
       const project = await this.getProjectById(id);
       if (!project) return false;
 
-      // Stop the project
       const projectPath = path.join(this.projectsDir, project.name);
-      await this.dockerService.stopProject(projectPath);
+      
+      // Try to stop the project if it exists and is running
+      try {
+        await this.dockerService.stopProject(projectPath);
+      } catch (stopError) {
+        // Log the error but continue with deletion
+        this.logger.warn(`Failed to stop project ${project.name}: ${stopError.message}`);
+      }
 
-      // Remove project directory
-      await fs.rm(projectPath, { recursive: true, force: true });
+      // Remove project directory if it exists
+      try {
+        await fs.rm(projectPath, { recursive: true, force: true });
+      } catch (rmError) {
+        // Log the error but continue with database deletion
+        this.logger.warn(`Failed to remove project directory ${projectPath}: ${rmError.message}`);
+      }
 
       // Remove from MongoDB repository
       await this.getProjectRepository().delete(id);
