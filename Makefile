@@ -104,7 +104,7 @@ define validate_file
 	fi
 endef
 
-.PHONY: help setup up down restart logs status clean backup restore update dev dev-detached start start-logs test build \
+.PHONY: help setup up down restart logs status clean backup restore update dev dev-clean dev-api dev-detached start start-logs test build \
         setup-services check-api test build update clean validate-backup-dir backup restore \
         restore-backup security scan deploy quick-prod env-info resources disk network \
         emergency-stop reset-all logs-% restart-% help-% system-check
@@ -124,6 +124,8 @@ help:
 	@echo "  setup-services - Setup MongoDB and Redis natively on Pi"
 	@echo "  up             - Start production environment"
 	@echo "  dev            - Start development environment with console output"
+	@echo "  dev-clean      - Start dev environment with clean logs (API & Web only)"
+	@echo "  dev-api        - Start dev environment with API logs only"
 	@echo "  dev-detached   - Start development environment in background"
 	@echo "  start          - Quick start dev environment (alias for dev-detached)"
 	@echo "  start-logs     - Quick start dev environment with logs (alias for dev)"
@@ -170,6 +172,8 @@ help:
 	@echo ""
 	@echo "$(YELLOW)Examples:$(NC)"
 	@echo "  make dev                # Start dev environment with live console output (attached)"
+	@echo "  make dev-clean          # Start dev environment with clean logs (API & Web only)"
+	@echo "  make dev-api            # Start dev environment with API logs only (cleanest)"
 	@echo "  make dev-detached       # Start dev environment in background (detached)"
 	@echo "  make start              # Quick start in background (same as dev-detached)"
 	@echo "  make start-logs         # Quick start with logs (same as dev)"
@@ -178,7 +182,9 @@ help:
 	@echo "  make check-api API_URL=http://192.168.1.100:3001"
 	@echo ""
 	@echo "$(BLUE)Development Mode Notes:$(NC)"
-	@echo "  • 'make dev' or 'make start-logs' - Shows live logs, press Ctrl+C to stop"
+	@echo "  • 'make dev' or 'make start-logs' - Shows all service logs, press Ctrl+C to stop"
+	@echo "  • 'make dev-clean' - Shows only API and Web logs (cleaner output)"
+	@echo "  • 'make dev-api' - Shows only API logs (cleanest for API development)"
 	@echo "  • 'make dev-detached' or 'make start' - Runs in background, use 'make logs' to view logs"
 
 # Environment setup
@@ -209,20 +215,25 @@ dev: setup
 	@echo "$(BLUE)Setting up development environment...$(NC)"
 	@echo "$(BLUE)Stopping any running production services...$(NC)"
 	@$(DOCKER_COMPOSE) down 2>/dev/null || echo "$(YELLOW)No production services to stop$(NC)"
-	@echo "$(BLUE)Starting development environment with console output...$(NC)"
+	@echo "$(BLUE)Creating docker network if needed...$(NC)"
+	@$(DOCKER) network create pi-network 2>/dev/null || echo "$(YELLOW)Network pi-network already exists$(NC)"
+	@echo "$(BLUE)Starting development environment with clean console output...$(NC)"
 	@echo "$(YELLOW)Press Ctrl+C to stop all services$(NC)"
 	@echo "$(GREEN)Frontend: $(WEB_URL)$(NC)"
 	@echo "$(GREEN)API: $(API_URL)$(NC)"
 	@echo "$(GREEN)MongoDB: localhost:$(MONGO_PORT)$(NC)"
 	@echo "$(GREEN)Redis: localhost:$(REDIS_PORT)$(NC)"
-	@echo "$(BLUE)Starting services...$(NC)"
-	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE_DEV) up
+	@echo "$(BLUE)Starting services with organized logs...$(NC)"
+	@echo "$(YELLOW)========================================$(NC)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE_DEV) up --no-color
 
 # Development environment (detached mode)
 dev-detached: setup
 	@echo "$(BLUE)Setting up development environment...$(NC)"
 	@echo "$(BLUE)Stopping any running production services...$(NC)"
 	@$(DOCKER_COMPOSE) down 2>/dev/null || echo "$(YELLOW)No production services to stop$(NC)"
+	@echo "$(BLUE)Creating docker network if needed...$(NC)"
+	@$(DOCKER) network create pi-network 2>/dev/null || echo "$(YELLOW)Network pi-network already exists$(NC)"
 	@echo "$(BLUE)Starting development environment in background...$(NC)"
 	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE_DEV) up -d
 	$(call success_msg,"Development environment started!")
@@ -237,6 +248,40 @@ start: dev-detached
 
 # Quick development with logs (alias for dev)
 start-logs: dev
+
+# Development environment with filtered logs (API and Web only)
+dev-clean: setup
+	@echo "$(BLUE)Setting up development environment...$(NC)"
+	@echo "$(BLUE)Stopping any running production services...$(NC)"
+	@$(DOCKER_COMPOSE) down 2>/dev/null || echo "$(YELLOW)No production services to stop$(NC)"
+	@echo "$(BLUE)Creating docker network if needed...$(NC)"
+	@$(DOCKER) network create pi-network 2>/dev/null || echo "$(YELLOW)Network pi-network already exists$(NC)"
+	@echo "$(BLUE)Starting development environment with clean logs...$(NC)"
+	@echo "$(YELLOW)Press Ctrl+C to stop all services$(NC)"
+	@echo "$(GREEN)Frontend: $(WEB_URL)$(NC)"
+	@echo "$(GREEN)API: $(API_URL)$(NC)"
+	@echo "$(GREEN)MongoDB: localhost:$(MONGO_PORT)$(NC)"
+	@echo "$(GREEN)Redis: localhost:$(REDIS_PORT)$(NC)"
+	@echo "$(BLUE)Starting services (showing API and Web logs only)...$(NC)"
+	@echo "$(YELLOW)========================================$(NC)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE_DEV) up --no-color api web
+
+# Development environment with API logs only
+dev-api: setup
+	@echo "$(BLUE)Setting up development environment...$(NC)"
+	@echo "$(BLUE)Stopping any running production services...$(NC)"
+	@$(DOCKER_COMPOSE) down 2>/dev/null || echo "$(YELLOW)No production services to stop$(NC)"
+	@echo "$(BLUE)Creating docker network if needed...$(NC)"
+	@$(DOCKER) network create pi-network 2>/dev/null || echo "$(YELLOW)Network pi-network already exists$(NC)"
+	@echo "$(BLUE)Starting development environment with API logs only...$(NC)"
+	@echo "$(YELLOW)Press Ctrl+C to stop all services$(NC)"
+	@echo "$(GREEN)Frontend: $(WEB_URL)$(NC)"
+	@echo "$(GREEN)API: $(API_URL)$(NC)"
+	@echo "$(GREEN)MongoDB: localhost:$(MONGO_PORT)$(NC)"
+	@echo "$(GREEN)Redis: localhost:$(REDIS_PORT)$(NC)"
+	@echo "$(BLUE)Starting services (showing API logs only)...$(NC)"
+	@echo "$(YELLOW)========================================$(NC)"
+	@$(DOCKER_COMPOSE) -f $(COMPOSE_FILE_DEV) up --no-color api
 
 # Stop services
 down:

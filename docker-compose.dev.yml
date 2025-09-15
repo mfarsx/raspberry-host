@@ -36,7 +36,7 @@ services:
       redis:
         condition: service_healthy
     networks:
-      - ${DOCKER_NETWORK_NAME_DEV:-pi-network}
+      - pi-network
 
   # Development Web
   web:
@@ -55,7 +55,7 @@ services:
     ports:
       - "${WEB_PORT_DEV:-3000}:3000"
     networks:
-      - ${DOCKER_NETWORK_NAME_DEV:-pi-network}
+      - pi-network
 
   # Development MongoDB
   mongodb:
@@ -77,7 +77,7 @@ services:
       retries: ${MONGO_HEALTH_RETRIES_DEV:-5}
       start_period: ${MONGO_HEALTH_START_PERIOD_DEV:-40s}
     networks:
-      - ${DOCKER_NETWORK_NAME_DEV:-pi-network}
+      - pi-network
 
   # Development Redis
   redis:
@@ -96,7 +96,7 @@ services:
       retries: ${REDIS_HEALTH_RETRIES_DEV:-3}
       start_period: ${REDIS_HEALTH_START_PERIOD_DEV:-20s}
     networks:
-      - ${DOCKER_NETWORK_NAME_DEV:-pi-network}
+      - pi-network
 
 volumes:
   mongodb_dev_data:
@@ -111,5 +111,5 @@ volumes:
     driver: local
 
 networks:
-  ${DOCKER_NETWORK_NAME_DEV:-pi-network}:
-    driver: ${DOCKER_NETWORK_DRIVER_DEV:-bridge}
+  pi-network:
+    driver: bridge
