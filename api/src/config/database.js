@@ -10,7 +10,6 @@ const connectDatabase = async () => {
       socketTimeoutMS: config.mongoSocketTimeout,
       connectTimeoutMS: config.mongoConnectTimeout,
       maxIdleTimeMS: config.mongoMaxIdleTime,
-      bufferMaxEntries: 0, // Disable mongoose buffering
       bufferCommands: false, // Disable mongoose buffering
     };
 

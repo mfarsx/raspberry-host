@@ -149,4 +149,29 @@ router.get(
   ResponseHelper.asyncHandler(projectController.findAvailablePorts.bind(projectController))
 );
 
+// Status synchronization endpoints
+// Sync all project statuses
+router.post(
+  "/sync/statuses",
+  ...MiddlewareComposer.admin(),
+  ResponseHelper.asyncHandler(projectController.syncProjectStatuses.bind(projectController))
+);
+
+// Sync specific project status
+router.post(
+  "/:id/sync/status",
+  ...MiddlewareComposer.getResource(
+    projectController.syncProjectStatus.bind(projectController),
+    projectSchemas.projectId,
+    "admin"
+  )
+);
+
+// Get status sync service info
+router.get(
+  "/sync/info",
+  ...MiddlewareComposer.admin(),
+  ResponseHelper.asyncHandler(projectController.getStatusSyncInfo.bind(projectController))
+);
+
 module.exports = router;

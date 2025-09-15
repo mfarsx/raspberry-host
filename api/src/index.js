@@ -22,6 +22,7 @@ const requestIdMiddleware = require('./middleware/requestId');
 const { setupSocketIO } = require('./config/socketio');
 const config = require('./config/environment');
 const MonitoringService = require('./services/monitoringService');
+const StatusSyncService = require('./services/statusSyncService');
 
 const app = express();
 const server = createServer(app);
@@ -111,6 +112,9 @@ app.use('*', (req, res) => {
   });
 });
 
+// Global services for graceful shutdown
+let statusSyncService = null;
+
 // Graceful shutdown handling
 let isShuttingDown = false;
 
@@ -131,6 +135,12 @@ const gracefulShutdown = (signal) => {
     }
     
     logger.info('HTTP server closed');
+    
+    // Stop status sync service
+    if (statusSyncService) {
+      statusSyncService.stop();
+      logger.info('Status sync service stopped');
+    }
     
     // Close database connections if they exist
     try {
@@ -208,6 +218,10 @@ async function startServer() {
     // Connect to databases
     await connectDatabase();
     await connectRedis();
+    
+    // Initialize status sync service
+    statusSyncService = new StatusSyncService();
+    statusSyncService.start();
     
     server.listen(PORT, () => {
       timer.end();

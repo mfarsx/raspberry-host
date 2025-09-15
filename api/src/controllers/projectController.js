@@ -3,6 +3,7 @@ const ResponseHelper = require("../utils/responseHelper");
 const BaseController = require("../utils/baseController");
 const { ProjectService } = require("../services/projectService");
 const PortService = require("../services/portService");
+const StatusSyncService = require("../services/statusSyncService");
 const projectRepository = require("../repositories/projectRepository");
 
 class ProjectController extends BaseController {
@@ -10,6 +11,7 @@ class ProjectController extends BaseController {
     super('ProjectController');
     this.projectService = new ProjectService();
     this.portService = new PortService();
+    this.statusSyncService = new StatusSyncService();
   }
 
   /**
@@ -324,6 +326,51 @@ class ProjectController extends BaseController {
     } catch (error) {
       logger.error('Find available ports error:', error);
       return ResponseHelper.internalError(res, "Failed to find available ports");
+    }
+  }
+
+  /**
+   * Manually sync project statuses
+   */
+  async syncProjectStatuses(req, res) {
+    try {
+      await this.statusSyncService.syncProjectStatuses();
+      return ResponseHelper.success(res, null, "Project statuses synchronized successfully");
+    } catch (error) {
+      logger.error('Manual status sync error:', error);
+      return ResponseHelper.internalError(res, "Failed to sync project statuses");
+    }
+  }
+
+  /**
+   * Sync status for a specific project
+   */
+  async syncProjectStatus(req, res) {
+    try {
+      const { id } = req.params;
+      await this.statusSyncService.syncProject(id);
+      return ResponseHelper.success(res, null, "Project status synchronized successfully");
+    } catch (error) {
+      logger.error('Manual project status sync error:', error);
+      
+      if (error.message.includes('not found')) {
+        return ResponseHelper.notFound(res, "Project not found");
+      }
+      
+      return ResponseHelper.internalError(res, "Failed to sync project status");
+    }
+  }
+
+  /**
+   * Get status sync service information
+   */
+  async getStatusSyncInfo(req, res) {
+    try {
+      const syncStatus = this.statusSyncService.getSyncStatus();
+      return ResponseHelper.success(res, syncStatus, "Status sync information retrieved successfully");
+    } catch (error) {
+      logger.error('Get status sync info error:', error);
+      return ResponseHelper.internalError(res, "Failed to get status sync information");
     }
   }
 }

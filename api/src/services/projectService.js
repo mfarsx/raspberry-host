@@ -289,8 +289,25 @@ class ProjectService extends BaseService {
    * @private
    */
   async _finalizeDeployment(savedProject, projectId) {
-    await this.getProjectRepository().updateStatus(savedProject._id, "running");
-    await this._invalidateProjectCache(projectId);
+    try {
+      // Verify the project is actually running before marking as running
+      const projectPath = path.join(this.projectsDir, savedProject.name);
+      const dockerStatus = await this.dockerService.getProjectStatus(projectPath);
+      
+      if (dockerStatus.status === 'running') {
+        await this.getProjectRepository().updateStatus(savedProject._id, "running");
+        this.logger.info(`Project ${savedProject.name} successfully deployed and running`);
+      } else {
+        await this.getProjectRepository().updateStatus(savedProject._id, "error");
+        this.logger.error(`Project ${savedProject.name} deployment completed but not running`);
+      }
+      
+      await this._invalidateProjectCache(projectId);
+    } catch (error) {
+      this.logger.error(`Failed to finalize deployment for project ${savedProject.name}:`, error);
+      await this.getProjectRepository().updateStatus(savedProject._id, "error");
+      await this._invalidateProjectCache(projectId);
+    }
   }
 
   /**
