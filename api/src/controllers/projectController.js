@@ -1,11 +1,13 @@
 const { logger } = require("../config/logger");
 const ResponseHelper = require("../utils/responseHelper");
+const BaseController = require("../utils/baseController");
 const { ProjectService } = require("../services/projectService");
 const PortService = require("../services/portService");
 const projectRepository = require("../repositories/projectRepository");
 
-class ProjectController {
+class ProjectController extends BaseController {
   constructor() {
+    super('ProjectController');
     this.projectService = new ProjectService();
     this.portService = new PortService();
   }
@@ -14,19 +16,16 @@ class ProjectController {
    * Get all hosted projects
    */
   async getAllProjects(req, res) {
-    try {
-      const { page = 1, limit = 10, status, search } = req.query;
-      const filters = {};
-      
-      if (status) filters.status = status;
-      if (search) filters.search = search;
+    return this.handlePaginatedList(req, res, async (req, res) => {
+      const { page, limit } = this.extractPaginationParams(req);
+      const filters = this.extractFilterParams(req, ['status', 'search']);
       
       const result = await projectRepository.findAll(page, limit, filters);
-      return ResponseHelper.successWithPagination(res, result.projects, result.pagination);
-    } catch (error) {
-      logger.error('Get all projects error:', error);
-      return ResponseHelper.internalError(res, "Failed to get projects");
-    }
+      return {
+        data: result.projects,
+        pagination: result.pagination
+      };
+    }, 'Projects');
   }
 
   /**
@@ -58,26 +57,17 @@ class ProjectController {
    * Get project by ID
    */
   async getProjectById(req, res) {
-    try {
+    return this.handleSingleResource(req, res, async (req, res) => {
       const { id } = req.params;
-      const project = await projectRepository.findById(id);
-
-      if (!project) {
-        return ResponseHelper.notFound(res, "Project not found");
-      }
-
-      return ResponseHelper.success(res, project);
-    } catch (error) {
-      logger.error('Get project by ID error:', error);
-      return ResponseHelper.internalError(res, "Failed to get project");
-    }
+      return await projectRepository.findById(id);
+    }, 'Project');
   }
 
   /**
    * Deploy new project
    */
   async deployProject(req, res) {
-    try {
+    return this.handleCreate(req, res, async (req, res) => {
       const projectData = {
         ...req.body,
         createdBy: req.user.id
@@ -86,81 +76,66 @@ class ProjectController {
       // Check if domain is available
       const domainAvailable = await projectRepository.isDomainAvailable(projectData.domain);
       if (!domainAvailable) {
-        return ResponseHelper.conflict(res, "Domain already in use");
+        const error = new Error("Domain already in use");
+        error.name = 'ConflictError';
+        throw error;
       }
 
       // Check if project name is available
       const nameAvailable = await projectRepository.isNameAvailable(projectData.name);
       if (!nameAvailable) {
-        return ResponseHelper.conflict(res, "Project name already exists");
+        const error = new Error("Project name already exists");
+        error.name = 'ConflictError';
+        throw error;
       }
 
       // Deploy project using service (which handles database creation)
-      try {
-        const deployedProject = await this.projectService.deployProject(projectData);
-        logger.info(`Project deployed: ${deployedProject.name} at ${deployedProject.domain}`);
-        return ResponseHelper.created(res, deployedProject, "Project deployed successfully");
-      } catch (deployError) {
-        logger.error('Deployment failed:', deployError);
-        // The project service already handles error status updates
-        return ResponseHelper.serverError(res, deployError.message);
-      }
-    } catch (error) {
-      logger.error('Deploy project error:', error);
-      return ResponseHelper.serverError(res, "Failed to deploy project");
-    }
+      const deployedProject = await this.projectService.deployProject(projectData);
+      this.logger.info(`Project deployed: ${deployedProject.name} at ${deployedProject.domain}`);
+      return deployedProject;
+    }, 'Project', 'Project deployed successfully');
   }
 
   /**
    * Update project
    */
   async updateProject(req, res) {
-    const { id } = req.params;
-    const project = await this.projectService.updateProject(id, req.body);
-
-    if (!project) {
-      return ResponseHelper.notFound(res, "Project not found");
-    }
-
-    return ResponseHelper.success(res, project, {
-      message: "Project updated successfully",
-    });
+    return this.handleUpdate(req, res, async (req, res) => {
+      const { id } = req.params;
+      return await this.projectService.updateProject(id, req.body);
+    }, 'Project', 'Project updated successfully');
   }
 
   /**
    * Delete project
    */
   async deleteProject(req, res) {
-    const { id } = req.params;
-    const success = await this.projectService.deleteProject(id);
-
-    if (!success) {
-      return ResponseHelper.notFound(res, "Project not found");
-    }
-
-    logger.info(`Project deleted: ${id}`);
-
-    return ResponseHelper.success(res, null, {
-      message: "Project deleted successfully",
-    });
+    return this.handleDelete(req, res, async (req, res) => {
+      const { id } = req.params;
+      const success = await this.projectService.deleteProject(id);
+      
+      if (success) {
+        this.logger.info(`Project deleted: ${id}`);
+      }
+      
+      return success;
+    }, 'Project', 'Project deleted successfully');
   }
 
   /**
    * Restart project
    */
   async restartProject(req, res) {
-    const { id } = req.params;
-    const success = await this.projectService.restartProject(id);
-
-    if (!success) {
-      return ResponseHelper.notFound(res, "Project not found");
-    }
-
-    logger.info(`Project restarted: ${id}`);
-
-    return ResponseHelper.success(res, null, {
-      message: "Project restarted successfully",
-    });
+    return this.handleAction(req, res, async (req, res) => {
+      const { id } = req.params;
+      const success = await this.projectService.restartProject(id);
+      
+      if (success) {
+        this.logger.info(`Project restarted: ${id}`);
+      }
+      
+      return success;
+    }, 'Project restart', 'Project restarted successfully');
   }
 
   /**

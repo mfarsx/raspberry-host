@@ -1,6 +1,7 @@
 const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
 const { logger } = require('../config/logger');
+const config = require('../config/environment');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -67,6 +68,7 @@ function validateFilePath(filePath, basePath) {
 class GitService {
   constructor() {
     this.logger = logger;
+    this.gitCloneTimeout = config.gitCloneTimeout;
   }
 
   /**
@@ -89,7 +91,7 @@ class GitService {
       return new Promise((resolve, reject) => {
         const child = spawn('git', ['clone', '-b', sanitizedBranch, sanitizedUrl, sanitizedPath], {
           stdio: ['pipe', 'pipe', 'pipe'],
-          timeout: 300000 // 5 minutes timeout
+          timeout: this.gitCloneTimeout
         });
         
         let stdout = '';
@@ -140,7 +142,7 @@ class GitService {
         const child = spawn('git', ['pull', 'origin', sanitizedBranch], {
           cwd: sanitizedPath,
           stdio: ['pipe', 'pipe', 'pipe'],
-          timeout: 300000 // 5 minutes timeout
+          timeout: this.gitCloneTimeout
         });
         
         let stdout = '';

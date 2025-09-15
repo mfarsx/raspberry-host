@@ -1,6 +1,7 @@
 const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
 const { logger } = require('../config/logger');
+const config = require('../config/environment');
 const fs = require('fs').promises;
 const path = require('path');
 const BaseService = require('../utils/baseService');
@@ -49,6 +50,11 @@ function validateFilePath(filePath, basePath) {
 class DockerService extends BaseService {
   constructor(dependencies = {}) {
     super('DockerService', dependencies);
+    
+    // Load timeout configurations
+    this.buildTimeout = config.buildTimeout;
+    this.deploymentTimeout = config.deploymentTimeout;
+    this.gitCloneTimeout = config.gitCloneTimeout;
   }
 
   /**
@@ -71,7 +77,7 @@ class DockerService extends BaseService {
       return new Promise((resolve, reject) => {
         const child = spawn('sh', ['-c', `cd "${sanitizedPath}" && ${sanitizedCommand}`], {
           stdio: ['pipe', 'pipe', 'pipe'],
-          timeout: 300000 // 5 minutes timeout
+          timeout: this.buildTimeout
         });
         
         let stdout = '';
@@ -137,10 +143,10 @@ class DockerService extends BaseService {
           child.kill('SIGTERM');
           this.logger.error('Build timeout:', {
             projectPath: sanitizedPath,
-            timeout: '5 minutes'
+            timeout: `${this.buildTimeout / 1000} seconds`
           });
           
-          reject(new Error('Build timeout after 5 minutes'));
+          reject(new Error(`Build timeout after ${this.buildTimeout / 1000} seconds`));
         });
       });
     } catch (error) {
@@ -251,7 +257,7 @@ class DockerService extends BaseService {
         const child = spawn('docker-compose', ['up', '-d'], {
           cwd: sanitizedPath,
           stdio: ['pipe', 'pipe', 'pipe'],
-          timeout: 300000 // 5 minutes timeout
+          timeout: this.deploymentTimeout
         });
         
         let stdout = '';

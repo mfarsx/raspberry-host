@@ -88,6 +88,79 @@ class EnvironmentConfig {
     return process.env.ENABLE_SECURITY_HEADERS !== 'false';
   }
 
+  // MongoDB Configuration
+  get mongoMaxPoolSize() {
+    return parseInt(process.env.MONGO_MAX_POOL_SIZE) || 10;
+  }
+
+  get mongoServerSelectionTimeout() {
+    return parseInt(process.env.MONGO_SERVER_SELECTION_TIMEOUT) || 5000;
+  }
+
+  get mongoSocketTimeout() {
+    return parseInt(process.env.MONGO_SOCKET_TIMEOUT) || 45000;
+  }
+
+  get mongoConnectTimeout() {
+    return parseInt(process.env.MONGO_CONNECT_TIMEOUT) || 10000;
+  }
+
+  get mongoMaxIdleTime() {
+    return parseInt(process.env.MONGO_MAX_IDLE_TIME) || 30000;
+  }
+
+  // Deployment Configuration
+  get maxConcurrentDeployments() {
+    return parseInt(process.env.MAX_CONCURRENT_DEPLOYMENTS) || 3;
+  }
+
+  get deploymentTimeout() {
+    return parseInt(process.env.DEPLOYMENT_TIMEOUT) || 300000; // 5 minutes
+  }
+
+  get buildTimeout() {
+    return parseInt(process.env.BUILD_TIMEOUT) || 600000; // 10 minutes
+  }
+
+  get gitCloneTimeout() {
+    return parseInt(process.env.GIT_CLONE_TIMEOUT) || 120000; // 2 minutes
+  }
+
+  // Port Configuration
+  get portRangeMin() {
+    return parseInt(process.env.PORT_RANGE_MIN) || 3000;
+  }
+
+  get portRangeMax() {
+    return parseInt(process.env.PORT_RANGE_MAX) || 9999;
+  }
+
+  get maxPortsPerUser() {
+    return parseInt(process.env.MAX_PORTS_PER_USER) || 10;
+  }
+
+  // Cache Configuration
+  get cacheDefaultTTL() {
+    return parseInt(process.env.CACHE_DEFAULT_TTL) || 300; // 5 minutes
+  }
+
+  get cacheMaxSize() {
+    return parseInt(process.env.CACHE_MAX_SIZE) || 1000;
+  }
+
+  // Security Configuration
+  get sessionTimeout() {
+    return parseInt(process.env.SESSION_TIMEOUT) || 3600000; // 1 hour
+  }
+
+  get maxLoginAttempts() {
+    return parseInt(process.env.MAX_LOGIN_ATTEMPTS) || 5;
+  }
+
+  get lockoutDuration() {
+    return parseInt(process.env.LOCKOUT_DURATION) || 900000; // 15 minutes
+  }
+
   validateRequiredVariables() {
     if (this.isProduction) {
       const required = ['MONGO_URL', 'REDIS_URL', 'JWT_SECRET'];

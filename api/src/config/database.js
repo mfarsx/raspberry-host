@@ -8,6 +8,10 @@ const connectDatabase = async () => {
       maxPoolSize: config.mongoMaxPoolSize,
       serverSelectionTimeoutMS: config.mongoServerSelectionTimeout,
       socketTimeoutMS: config.mongoSocketTimeout,
+      connectTimeoutMS: config.mongoConnectTimeout,
+      maxIdleTimeMS: config.mongoMaxIdleTime,
+      bufferMaxEntries: 0, // Disable mongoose buffering
+      bufferCommands: false, // Disable mongoose buffering
     };
 
     await mongoose.connect(config.mongoUrl, options);
