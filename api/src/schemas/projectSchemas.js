@@ -20,10 +20,10 @@ const projectSchemas = {
     domain: Joi.string()
       .min(1)
       .max(255)
-      .pattern(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)
+      .pattern(/^[a-zA-Z0-9.-]+(\.[a-zA-Z]{2,})?(:[0-9]{1,5})?$/)
       .required()
       .messages({
-        'string.pattern.base': 'Domain must be a valid domain name',
+        'string.pattern.base': 'Domain must be a valid domain name (e.g., example.com, localhost:3000, or myapp.local)',
         'string.min': 'Domain cannot be empty',
         'string.max': 'Domain cannot exceed 255 characters'
       }),
@@ -97,10 +97,10 @@ const projectSchemas = {
     domain: Joi.string()
       .min(1)
       .max(255)
-      .pattern(/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/)
+      .pattern(/^[a-zA-Z0-9.-]+(\.[a-zA-Z]{2,})?(:[0-9]{1,5})?$/)
       .optional()
       .messages({
-        'string.pattern.base': 'Domain must be a valid domain name',
+        'string.pattern.base': 'Domain must be a valid domain name (e.g., example.com, localhost:3000, or myapp.local)',
         'string.min': 'Domain cannot be empty',
         'string.max': 'Domain cannot exceed 255 characters'
       }),

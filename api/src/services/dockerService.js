@@ -154,6 +154,36 @@ class DockerService extends BaseService {
   }
 
   /**
+   * Find the correct Docker Compose file in a project directory
+   * @param {string} projectPath - Path to the project
+   * @returns {Promise<string>} Path to the compose file
+   */
+  async findComposeFile(projectPath) {
+    const sanitizedPath = validateFilePath(projectPath, process.cwd());
+    const possibleFiles = [
+      'compose.yaml',
+      'docker-compose.yml',
+      'docker-compose.yaml',
+      'compose.yml'
+    ];
+    
+    for (const fileName of possibleFiles) {
+      const filePath = path.join(sanitizedPath, fileName);
+      try {
+        await fs.access(filePath);
+        return filePath;
+      } catch (error) {
+        // File doesn't exist, try next one
+        continue;
+      }
+    }
+    
+    // If no compose file found, create one
+    const composePath = path.join(sanitizedPath, 'compose.yaml');
+    return composePath;
+  }
+
+  /**
    * Create Docker Compose file for a project
    * @param {Object} project - Project configuration
    * @param {string} projectPath - Path to the project
@@ -167,7 +197,7 @@ class DockerService extends BaseService {
       
       try {
         const sanitizedPath = validateFilePath(projectPath, process.cwd());
-        const composePath = path.join(sanitizedPath, 'compose.yaml');
+        const composePath = await this.findComposeFile(projectPath);
         const composeContent = this.generateComposeContent(project);
         
         await fs.writeFile(composePath, composeContent);
@@ -192,7 +222,7 @@ class DockerService extends BaseService {
   async startProject(projectPath) {
     try {
       const sanitizedPath = validateFilePath(projectPath, process.cwd());
-      const composeFile = path.join(sanitizedPath, 'compose.yaml');
+      const composeFile = await this.findComposeFile(projectPath);
       
       this.logger.info(`Starting Docker project: ${sanitizedPath}`);
       
@@ -361,7 +391,7 @@ class DockerService extends BaseService {
   async getProjectLogs(projectPath, lines = 100) {
     try {
       const sanitizedPath = validateFilePath(projectPath, process.cwd());
-      const composeFile = path.join(sanitizedPath, 'compose.yaml');
+      const composeFile = await this.findComposeFile(projectPath);
       
       // Validate lines parameter
       const sanitizedLines = Math.max(1, Math.min(10000, parseInt(lines) || 100));
@@ -412,7 +442,7 @@ class DockerService extends BaseService {
   async getProjectStatus(projectPath) {
     try {
       const sanitizedPath = validateFilePath(projectPath, process.cwd());
-      const composeFile = path.join(sanitizedPath, 'compose.yaml');
+      const composeFile = await this.findComposeFile(projectPath);
       
       return new Promise((resolve, reject) => {
         const child = spawn('docker-compose', ['-f', composeFile, 'ps', '--format', 'json'], {
@@ -873,7 +903,7 @@ volumes:
   async getProjectLogsStream(projectPath, options = {}) {
     try {
       const sanitizedPath = validateFilePath(projectPath, process.cwd());
-      const composeFile = path.join(sanitizedPath, 'compose.yaml');
+      const composeFile = await this.findComposeFile(projectPath);
       
       // Default options
       const streamOptions = {

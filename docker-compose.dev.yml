@@ -5,97 +5,98 @@ services:
   # Development API
   api:
     build:
-      context: ./api
-      dockerfile: Dockerfile
-      target: development
-    container_name: pi-api-dev
-    restart: unless-stopped
+      context: ${API_BUILD_CONTEXT:-./api}
+      dockerfile: ${API_DOCKERFILE:-Dockerfile}
+      target: ${API_BUILD_TARGET_DEV:-development}
+    container_name: ${API_CONTAINER_NAME_DEV:-pi-api-dev}
+    restart: ${API_RESTART_POLICY_DEV:-unless-stopped}
     environment:
-      - NODE_ENV=development
-      - PORT=3001
-      - MONGO_URL=mongodb://mongodb:27017/pi_app_dev
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=dev-jwt-secret-key-for-development-only-minimum-32-characters
-      - CORS_ORIGIN=http://localhost:3000
-      - LOG_LEVEL=debug
+      - NODE_ENV=${NODE_ENV_DEV:-development}
+      - PORT=${API_PORT_DEV:-3001}
+      - MONGO_URL=${MONGO_URL_DEV:-mongodb://mongodb:${MONGO_PORT_DEV:-27017}/${MONGO_DATABASE_DEV:-pi_app_dev}}
+      - REDIS_URL=${REDIS_URL_DEV:-redis://redis:${REDIS_PORT_DEV:-6379}}
+      - JWT_SECRET=${JWT_SECRET_DEV:-dev-jwt-secret-key-for-development-only-minimum-32-characters}
+      - CORS_ORIGIN=${CORS_ORIGIN_DEV:-http://localhost:3000}
+      - LOG_LEVEL=${LOG_LEVEL_DEV:-debug}
+      - PROJECTS_DIR=${PROJECTS_DIR_DEV:-./projects}
     volumes:
-      - ./api:/app
+      - ${API_SOURCE_PATH:-./api}:/app
       - /app/node_modules
       - api_logs:/app/logs
       - api_uploads:/app/uploads
-      - /Users/mfarsx/.docker/run/docker.sock:/var/run/docker.sock
-    user: "0:0"
+      - ${DOCKER_SOCKET_PATH_DEV:-/var/run/docker.sock}:/var/run/docker.sock
+    user: "${API_USER_DEV:-0:0}"
     group_add:
-      - "999"
+      - "${API_GROUP_DEV:-999}"
     ports:
-      - "3001:3001"
+      - "${API_PORT_DEV:-3001}:${API_PORT_DEV:-3001}"
     depends_on:
       mongodb:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks:
-      - pi-network
+      - ${DOCKER_NETWORK_NAME_DEV:-pi-network}
 
   # Development Web
   web:
-    image: node:20-alpine
-    container_name: pi-web-dev
-    restart: unless-stopped
+    image: ${WEB_IMAGE_DEV:-node:20-alpine}
+    container_name: ${WEB_CONTAINER_NAME_DEV:-pi-web-dev}
+    restart: ${WEB_RESTART_POLICY_DEV:-unless-stopped}
     working_dir: /app
     command: sh -c "npm install && NODE_OPTIONS='--no-deprecation' npm start"
     environment:
-      - REACT_APP_API_URL=http://localhost:3001/api
-      - REACT_APP_WS_URL=ws://localhost:3001
-      - REACT_APP_ENV=development
-      - NODE_NO_WARNINGS=1
+      - REACT_APP_API_URL=${REACT_APP_API_URL_DEV:-http://localhost:3001/api}
+      - REACT_APP_WS_URL=${REACT_APP_WS_URL_DEV:-ws://localhost:3001}
+      - REACT_APP_ENV=${REACT_APP_ENV_DEV:-development}
+      - NODE_NO_WARNINGS=${NODE_NO_WARNINGS_DEV:-1}
     volumes:
-      - ./web:/app
+      - ${WEB_SOURCE_PATH:-./web}:/app
     ports:
-      - "3000:3000"
+      - "${WEB_PORT_DEV:-3000}:3000"
     networks:
-      - pi-network
+      - ${DOCKER_NETWORK_NAME_DEV:-pi-network}
 
   # Development MongoDB
   mongodb:
-    image: mongo:7.0-jammy
-    container_name: pi-mongodb-dev
-    restart: unless-stopped
+    image: ${MONGO_IMAGE_DEV:-mongo:7.0-jammy}
+    container_name: ${MONGO_CONTAINER_NAME_DEV:-pi-mongodb-dev}
+    restart: ${MONGO_RESTART_POLICY_DEV:-unless-stopped}
     environment:
-      - MONGO_INITDB_DATABASE=pi_app_dev
+      - MONGO_INITDB_DATABASE=${MONGO_DATABASE_DEV:-pi_app_dev}
     volumes:
       - mongodb_dev_data:/data/db
       - mongodb_dev_config:/data/configdb
     ports:
-      - "27017:27017"
+      - "${MONGO_PORT_DEV:-27017}:27017"
     command: mongod --bind_ip_all
     healthcheck:
       test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
+      interval: ${MONGO_HEALTH_INTERVAL_DEV:-30s}
+      timeout: ${MONGO_HEALTH_TIMEOUT_DEV:-10s}
+      retries: ${MONGO_HEALTH_RETRIES_DEV:-5}
+      start_period: ${MONGO_HEALTH_START_PERIOD_DEV:-40s}
     networks:
-      - pi-network
+      - ${DOCKER_NETWORK_NAME_DEV:-pi-network}
 
   # Development Redis
   redis:
-    image: redis:7.2-alpine
-    container_name: pi-redis-dev
-    restart: unless-stopped
+    image: ${REDIS_IMAGE_DEV:-redis:7.2-alpine}
+    container_name: ${REDIS_CONTAINER_NAME_DEV:-pi-redis-dev}
+    restart: ${REDIS_RESTART_POLICY_DEV:-unless-stopped}
     volumes:
       - redis_dev_data:/data
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT_DEV:-6379}:6379"
     command: redis-server --appendonly yes
     healthcheck:
       test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
+      interval: ${REDIS_HEALTH_INTERVAL_DEV:-30s}
+      timeout: ${REDIS_HEALTH_TIMEOUT_DEV:-10s}
+      retries: ${REDIS_HEALTH_RETRIES_DEV:-3}
+      start_period: ${REDIS_HEALTH_START_PERIOD_DEV:-20s}
     networks:
-      - pi-network
+      - ${DOCKER_NETWORK_NAME_DEV:-pi-network}
 
 volumes:
   mongodb_dev_data:
@@ -110,5 +111,5 @@ volumes:
     driver: local
 
 networks:
-  pi-network:
-    driver: bridge
+  ${DOCKER_NETWORK_NAME_DEV:-pi-network}:
+    driver: ${DOCKER_NETWORK_DRIVER_DEV:-bridge}
