@@ -1,11 +1,13 @@
 const { logger } = require("../config/logger");
 const ResponseHelper = require("../utils/responseHelper");
 const { ProjectService } = require("../services/projectService");
+const PortService = require("../services/portService");
 const projectRepository = require("../repositories/projectRepository");
 
 class ProjectController {
   constructor() {
     this.projectService = new ProjectService();
+    this.portService = new PortService();
   }
 
   /**
@@ -272,6 +274,81 @@ class ProjectController {
       }
 
       return ResponseHelper.serverError(res, "Failed to update project port");
+    }
+  }
+
+  /**
+   * Get port statistics and available ports
+   */
+  async getPortStatistics(req, res) {
+    try {
+      const statistics = await this.portService.getPortStatistics();
+      return ResponseHelper.success(res, statistics, "Port statistics retrieved successfully");
+    } catch (error) {
+      logger.error('Get port statistics error:', error);
+      return ResponseHelper.internalError(res, "Failed to get port statistics");
+    }
+  }
+
+  /**
+   * Check if a specific port is available
+   */
+  async checkPortAvailability(req, res) {
+    try {
+      const { port } = req.params;
+      const portNumber = parseInt(port);
+      
+      if (isNaN(portNumber) || portNumber < 1 || portNumber > 65535) {
+        return ResponseHelper.badRequest(res, "Invalid port number");
+      }
+
+      const isAvailable = !(await this.portService.isPortInUse(portNumber));
+      const statistics = await this.portService.getPortStatistics();
+      
+      return ResponseHelper.success(res, {
+        port: portNumber,
+        available: isAvailable,
+        statistics
+      }, `Port ${portNumber} is ${isAvailable ? 'available' : 'in use'}`);
+    } catch (error) {
+      logger.error('Check port availability error:', error);
+      return ResponseHelper.internalError(res, "Failed to check port availability");
+    }
+  }
+
+  /**
+   * Find available ports in a range
+   */
+  async findAvailablePorts(req, res) {
+    try {
+      const { min = 3000, max = 9999, count = 10 } = req.query;
+      const minPort = parseInt(min);
+      const maxPort = parseInt(max);
+      const portCount = parseInt(count);
+      
+      if (isNaN(minPort) || isNaN(maxPort) || isNaN(portCount)) {
+        return ResponseHelper.badRequest(res, "Invalid parameters");
+      }
+
+      if (minPort < 1 || maxPort > 65535 || minPort > maxPort) {
+        return ResponseHelper.badRequest(res, "Invalid port range");
+      }
+
+      const availablePorts = await this.portService.findAvailablePorts({
+        min: minPort,
+        max: maxPort,
+        count: portCount
+      });
+
+      return ResponseHelper.success(res, {
+        availablePorts,
+        range: { min: minPort, max: maxPort },
+        count: availablePorts.length,
+        requested: portCount
+      }, `Found ${availablePorts.length} available ports`);
+    } catch (error) {
+      logger.error('Find available ports error:', error);
+      return ResponseHelper.internalError(res, "Failed to find available ports");
     }
   }
 }

@@ -44,6 +44,16 @@ const projectSchema = new mongoose.Schema({
     min: 1,
     max: 65535
   },
+  autoPort: {
+    type: Boolean,
+    default: false
+  },
+  assignedPort: {
+    type: Number,
+    min: 1,
+    max: 65535,
+    default: null
+  },
   environment: {
     type: Map,
     of: String,
@@ -91,12 +101,19 @@ const projectSchema = new mongoose.Schema({
   }
 });
 
+// Virtual field for effective port (assignedPort or port)
+projectSchema.virtual('effectivePort').get(function() {
+  return this.assignedPort || this.port;
+});
+
 // Indexes for better performance
 projectSchema.index({ name: 1 });
 projectSchema.index({ domain: 1 });
 projectSchema.index({ status: 1 });
 projectSchema.index({ createdBy: 1 });
 projectSchema.index({ createdAt: -1 });
+projectSchema.index({ port: 1 });
+projectSchema.index({ assignedPort: 1 });
 
 // Update updatedAt field
 projectSchema.pre('save', function(next) {

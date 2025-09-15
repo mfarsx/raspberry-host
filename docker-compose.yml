@@ -42,7 +42,7 @@ services:
     build:
       context: ${API_BUILD_CONTEXT:-./api}
       dockerfile: ${API_DOCKERFILE:-Dockerfile}
-      target: ${API_BUILD_TARGET:-production}
+      target: production
       platforms:
         - ${DOCKER_PLATFORM:-linux/arm64}
     container_name: ${API_CONTAINER_NAME:-pi-api}
@@ -129,7 +129,7 @@ services:
       - mongodb_logs:/var/log/mongodb
       - ${MONGO_INIT_SCRIPT:-./scripts/mongo-init.js}:/docker-entrypoint-initdb.d/mongo-init.js:ro
     command: >
-      mongod --auth --bind_ip_all --logpath /var/log/mongodb/mongod.log --logappend --wiredTigerCacheSizeGB ${MONGO_CACHE_SIZE_GB:-0.5}
+      mongod --bind_ip_all --logpath /var/log/mongodb/mongod.log --logappend --wiredTigerCacheSizeGB ${MONGO_CACHE_SIZE_GB:-0.5}
     healthcheck:
       test: [ "CMD", "mongosh", "--eval", "db.adminCommand('ping')" ]
       interval: ${MONGO_HEALTH_INTERVAL:-30s}
@@ -221,8 +221,8 @@ volumes:
     driver: local
 
 networks:
-  ${DOCKER_NETWORK_NAME:-pi-network}:
-    driver: ${DOCKER_NETWORK_DRIVER:-bridge}
+  pi-network:
+    driver: bridge
     ipam:
       config:
-        - subnet: ${DOCKER_NETWORK_SUBNET:-172.20.0.0/16}
+        - subnet: 172.20.0.0/16

@@ -500,28 +500,48 @@ class DockerService extends BaseService {
    * @returns {string} Docker Compose content
    */
   generateComposeContent(project) {
-    const environmentVars = Object.entries(project.environment || {})
+    const effectivePort = project.effectivePort || project.assignedPort || project.port;
+    const environmentSection = this._generateEnvironmentSection(project.environment);
+    
+    return this._buildComposeTemplate({
+      projectName: project.name,
+      port: effectivePort,
+      environmentSection
+    });
+  }
+
+  /**
+   * Generate environment variables section
+   * @private
+   */
+  _generateEnvironmentSection(environment = {}) {
+    const envVars = Object.entries(environment)
+      .filter(([key, value]) => key && value)
       .map(([key, value]) => `      - ${key}=${value}`)
       .join('\n');
 
-    // Only include environment section if there are variables
-    const environmentSection = environmentVars ? `    environment:
-${environmentVars}` : '';
+    return envVars ? `    environment:\n${envVars}` : '';
+  }
 
+  /**
+   * Build Docker Compose template
+   * @private
+   */
+  _buildComposeTemplate({ projectName, port, environmentSection }) {
     return `services:
-  ${project.name}:
+  ${projectName}:
     build:
       context: .
       dockerfile: Dockerfile
       platforms:
         - linux/arm64
-    container_name: ${project.name}
+    container_name: ${projectName}
     restart: unless-stopped
     ports:
-      - "${project.port}:80"
+      - "${port}:80"
 ${environmentSection}
     volumes:
-      - ${project.name}_logs:/app/logs
+      - ${projectName}_logs:/app/logs
     networks:
       - pi-network
 
@@ -531,7 +551,7 @@ networks:
     name: raspberry-host_pi-network
 
 volumes:
-  ${project.name}_logs:
+  ${projectName}_logs:
     driver: local
 `;
   }

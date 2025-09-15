@@ -127,4 +127,26 @@ router.put(
   )
 );
 
+// Port management endpoints
+// Get port statistics
+router.get(
+  "/ports/statistics",
+  ...MiddlewareComposer.admin(),
+  ResponseHelper.asyncHandler(projectController.getPortStatistics.bind(projectController))
+);
+
+// Check port availability
+router.get(
+  "/ports/check/:port",
+  ...MiddlewareComposer.admin(),
+  ResponseHelper.asyncHandler(projectController.checkPortAvailability.bind(projectController))
+);
+
+// Find available ports
+router.get(
+  "/ports/available",
+  ...MiddlewareComposer.admin(),
+  ResponseHelper.asyncHandler(projectController.findAvailablePorts.bind(projectController))
+);
+
 module.exports = router;

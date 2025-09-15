@@ -10,6 +10,7 @@ const {
 } = require("../utils/serviceErrors");
 const GitService = require("./gitService");
 const DockerService = require("./dockerService");
+const PortService = require("./portService");
 const projectRepository = require("../repositories/projectRepository");
 const { getCacheService } = require("./cacheService");
 
@@ -98,6 +99,7 @@ class ProjectService extends BaseService {
     // Dependency injection
     this.gitService = dependencies.gitService || new GitService();
     this.dockerService = dependencies.dockerService || new DockerService();
+    this.portService = dependencies.portService || new PortService();
     this.projectRepository = dependencies.projectRepository || null;
     this.cacheService = dependencies.cacheService || getCacheService();
 
@@ -169,71 +171,147 @@ class ProjectService extends BaseService {
    * @returns {Promise<Object>} Deployed project data
    */
   async deployProject(projectData) {
-    const id = this.generateProjectId(projectData.name);
-    const project = {
-      ...projectData,
-      id,
-      status: "deploying",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastDeployed: new Date(),
-    };
-
+    const project = this._initializeProject(projectData);
     let savedProject = null;
-    try {
-      // Validate repository before starting deployment
-      const isValidRepo = await this.gitService.validateRepository(
-        project.repository
-      );
-      if (!isValidRepo) {
-        throw new Error(
-          `Invalid or inaccessible repository: ${project.repository}`
-        );
-      }
 
-      // Store project in MongoDB repository
+    try {
+      // Handle port assignment
+      await this._handlePortAssignment(project);
+
+      // Validate and prepare project
+      await this._validateAndPrepareProject(project);
+
+      // Store project in database
       savedProject = await this.getProjectRepository().create(project);
       project._id = savedProject._id;
 
-      // Clone repository
-      const projectPath = path.join(this.projectsDir, project.name);
-      await this.gitService.cloneRepository(
-        project.repository,
-        project.branch,
-        projectPath
-      );
+      // Deploy project infrastructure
+      await this._deployProjectInfrastructure(project);
 
-      // Build project if build command exists
-      if (project.buildCommand) {
-        await this.dockerService.buildProject(
-          projectPath,
-          project.buildCommand
-        );
-      }
-
-      // Create Docker Compose file for the project
-      await this.dockerService.createProjectCompose(project, projectPath);
-
-      // Start the project
-      await this.dockerService.startProject(projectPath);
-
-      // Update project status
-      await this.getProjectRepository().updateStatus(savedProject._id, "running");
-
-      // Invalidate cache
-      await this.cacheService.delete("projects:all");
-      await this.cacheService.delete(`project:${id}`);
+      // Update project status and cache
+      await this._finalizeDeployment(savedProject, project.id);
 
       this.logger.info(`Project deployed successfully: ${project.name}`);
       return savedProject;
     } catch (error) {
       this.logger.error("Failed to deploy project:", error);
-      // Update project status to error if we have a saved project
-      if (savedProject) {
-        await this.getProjectRepository().updateStatus(savedProject._id, "error");
-      }
+      await this._handleDeploymentError(savedProject);
       throw error;
     }
+  }
+
+  /**
+   * Initialize project object with default values
+   * @private
+   */
+  _initializeProject(projectData) {
+    return {
+      ...projectData,
+      id: this.generateProjectId(projectData.name),
+      status: "deploying",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastDeployed: new Date(),
+    };
+  }
+
+  /**
+   * Handle port assignment logic
+   * @private
+   */
+  async _handlePortAssignment(project) {
+    if (project.autoPort) {
+      this.logger.info(`Auto-assigning port for project: ${project.name}`);
+      const assignedPort = await this.portService.autoAssignPort(project, {
+        preferredPort: project.port,
+        projectType: 'web',
+        allowReserved: false
+      });
+      project.assignedPort = assignedPort;
+      this.logger.info(`Assigned port ${assignedPort} to project: ${project.name}`);
+    } else {
+      await this._handlePortConflict(project);
+    }
+  }
+
+  /**
+   * Handle port conflicts for manual port assignment
+   * @private
+   */
+  async _handlePortConflict(project) {
+    const isPortInUse = await this.portService.isPortInUse(project.port);
+    if (isPortInUse) {
+      this.logger.warn(`Port ${project.port} is already in use for project: ${project.name}`);
+      const alternativePort = await this.portService.findAvailablePort({
+        preferredPort: project.port + 1,
+        minPort: project.port,
+        maxPort: project.port + 100,
+        allowReserved: false
+      });
+      project.assignedPort = alternativePort;
+      this.logger.info(`Using alternative port ${alternativePort} for project: ${project.name}`);
+    }
+  }
+
+  /**
+   * Validate repository and prepare project for deployment
+   * @private
+   */
+  async _validateAndPrepareProject(project) {
+    const isValidRepo = await this.gitService.validateRepository(project.repository);
+    if (!isValidRepo) {
+      throw new Error(`Invalid or inaccessible repository: ${project.repository}`);
+    }
+  }
+
+  /**
+   * Deploy project infrastructure (clone, build, compose, start)
+   * @private
+   */
+  async _deployProjectInfrastructure(project) {
+    const projectPath = path.join(this.projectsDir, project.name);
+
+    // Clone repository
+    await this.gitService.cloneRepository(project.repository, project.branch, projectPath);
+
+    // Build project if needed
+    if (project.buildCommand) {
+      await this.dockerService.buildProject(projectPath, project.buildCommand);
+    }
+
+    // Create and start Docker Compose
+    await this.dockerService.createProjectCompose(project, projectPath);
+    await this.dockerService.startProject(projectPath);
+  }
+
+  /**
+   * Finalize deployment by updating status and cache
+   * @private
+   */
+  async _finalizeDeployment(savedProject, projectId) {
+    await this.getProjectRepository().updateStatus(savedProject._id, "running");
+    await this._invalidateProjectCache(projectId);
+  }
+
+  /**
+   * Handle deployment errors
+   * @private
+   */
+  async _handleDeploymentError(savedProject) {
+    if (savedProject) {
+      await this.getProjectRepository().updateStatus(savedProject._id, "error");
+    }
+  }
+
+  /**
+   * Invalidate project-related cache entries
+   * @private
+   */
+  async _invalidateProjectCache(projectId) {
+    await Promise.all([
+      this.cacheService.delete("projects:all"),
+      this.cacheService.delete(`project:${projectId}`)
+    ]);
   }
 
   /**

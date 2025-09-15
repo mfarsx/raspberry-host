@@ -78,6 +78,24 @@ const projectSchemas = {
         'number.integer': 'Port must be an integer',
         'number.min': 'Port must be at least 1',
         'number.max': 'Port cannot exceed 65535'
+      }),
+    
+    autoPort: Joi.boolean()
+      .default(false)
+      .messages({
+        'boolean.base': 'Auto port must be a boolean value'
+      }),
+    
+    assignedPort: Joi.number()
+      .integer()
+      .min(1)
+      .max(65535)
+      .optional()
+      .messages({
+        'number.base': 'Assigned port must be a number',
+        'number.integer': 'Assigned port must be an integer',
+        'number.min': 'Assigned port must be at least 1',
+        'number.max': 'Assigned port cannot exceed 65535'
       })
   }),
 
