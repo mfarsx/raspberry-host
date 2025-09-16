@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import apiClient from '../config/axios';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { useAuth } from '../contexts/AuthContext';
 import LogViewer from './LogViewer';
 import ProjectConsole from './ProjectConsole';
 import { 
@@ -21,6 +22,7 @@ import {
 } from 'lucide-react';
 
 const ProjectManagement = () => {
+  const { isAuthenticated, user } = useAuth();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -40,8 +42,10 @@ const ProjectManagement = () => {
   const { isConnected, socket } = useWebSocket();
 
   useEffect(() => {
-    fetchProjects();
-  }, []);
+    if (isAuthenticated) {
+      fetchProjects();
+    }
+  }, [isAuthenticated]);
 
   // WebSocket event listeners for real-time updates
   useEffect(() => {
@@ -87,12 +91,32 @@ const ProjectManagement = () => {
   }, [socket, isConnected, liveLogs, selectedProject]);
 
   const fetchProjects = async () => {
+    console.log('fetchProjects called');
+    
+    if (!isAuthenticated) {
+      console.log('User not authenticated, redirecting to login');
+      toast.error('Please log in to view projects');
+      return;
+    }
+    
+    setLoading(true);
     try {
+      console.log('Making API request to /projects');
       const response = await apiClient.get('/projects');
+      console.log('API response:', response.data);
       setProjects(response.data.data || []);
+      toast.success('Projects refreshed successfully');
     } catch (error) {
-      toast.error('Failed to fetch projects');
       console.error('Error fetching projects:', error);
+      
+      if (error.response?.status === 401) {
+        toast.error('Authentication expired. Please log in again.');
+        // The axios interceptor should handle redirecting to login
+      } else if (error.response?.status === 403) {
+        toast.error('Access denied. You do not have permission to view projects.');
+      } else {
+        toast.error('Failed to fetch projects');
+      }
     } finally {
       setLoading(false);
     }
@@ -282,6 +306,18 @@ const ProjectManagement = () => {
     return matchesSearch && matchesStatus;
   });
 
+  if (!isAuthenticated) {
+    return (
+      <div className="card">
+        <div className="text-center">
+          <h3>Authentication Required</h3>
+          <p>Please log in to view and manage projects.</p>
+          <a href="/login" className="btn btn-primary">Log In</a>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="card">
@@ -312,12 +348,18 @@ const ProjectManagement = () => {
                 </span>
               )}
             </div>
+            {user && (
+              <div className="text-sm text-gray-600">
+                Logged in as: <span className="font-medium">{user.username}</span>
+              </div>
+            )}
           </div>
           <button 
             className="btn btn-success"
             onClick={fetchProjects}
+            disabled={loading}
           >
-            Refresh
+            {loading ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
 
