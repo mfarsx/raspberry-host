@@ -43,6 +43,45 @@ const userSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  // Soft delete fields
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+  // User preferences and settings
+  preferences: {
+    theme: {
+      type: String,
+      enum: ['light', 'dark', 'auto'],
+      default: 'light'
+    },
+    language: {
+      type: String,
+      default: 'en'
+    },
+    notifications: {
+      type: Boolean,
+      default: true
+    }
+  },
+  settings: {
+    emailNotifications: {
+      type: Boolean,
+      default: true
+    },
+    projectUpdates: {
+      type: Boolean,
+      default: true
+    },
+    systemAlerts: {
+      type: Boolean,
+      default: true
+    }
   }
 }, {
   timestamps: true,

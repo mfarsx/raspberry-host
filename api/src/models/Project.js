@@ -88,6 +88,30 @@ const projectSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  // Soft delete fields
+  isDeleted: {
+    type: Boolean,
+    default: false
+  },
+  deletedAt: {
+    type: Date,
+    default: null
+  },
+  // Project metadata and health tracking
+  metadata: {
+    type: Map,
+    of: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
+  healthStatus: {
+    type: String,
+    enum: ['healthy', 'unhealthy', 'unknown', 'checking'],
+    default: 'unknown'
+  },
+  lastHealthCheck: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true,
