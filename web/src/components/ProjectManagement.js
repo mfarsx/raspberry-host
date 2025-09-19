@@ -396,6 +396,17 @@ const ProjectManagement = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
+                    {project.status === 'running' && (
+                      <a
+                        href={`http://${project.domain}:${project.port}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-success btn-small"
+                        title="Visit Project - Opens in new tab"
+                      >
+                        <Wifi size={14} />
+                      </a>
+                    )}
                     <button
                       className="btn btn-secondary btn-small"
                       onClick={() => handleViewLogs(project.id)}
@@ -449,6 +460,17 @@ const ProjectManagement = () => {
                   <div className="flex items-center gap-2">
                     <Globe size={16} className="text-gray-500" />
                     <span className="text-sm">{project.domain}</span>
+                    {project.status === 'running' && (
+                      <a
+                        href={`http://${project.domain}:${project.port}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-primary btn-small ml-2"
+                        title="Open Project in New Tab"
+                      >
+                        <Wifi size={12} />
+                      </a>
+                    )}
                   </div>
                   
                   <div className="flex items-center gap-2">
@@ -469,6 +491,26 @@ const ProjectManagement = () => {
                       Uptime: {formatUptime(project.lastDeployed)}
                     </span>
                   </div>
+                  
+                  {project.status === 'running' && (
+                    <div className="flex items-center gap-2 mt-2 p-2 bg-green-50 border border-green-200 rounded">
+                      <Wifi size={16} className="text-green-600" />
+                      <span className="text-sm text-green-700 font-medium">
+                        Project is live at: 
+                        <a
+                          href={`http://${project.domain}:${project.port}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-1 text-green-600 hover:text-green-800 underline"
+                        >
+                          {project.domain}:{project.port}
+                        </a>
+                        <span className="text-xs text-gray-600 ml-2">
+                          (Try /health for API status)
+                        </span>
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 pt-4 border-t">
